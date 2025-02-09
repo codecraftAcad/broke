@@ -517,7 +517,7 @@ bot.launch({
   allowedUpdates: ["message", "message_reaction"],
   webhook: {
     host: "https://broke-za2z.onrender.com",
-    port: 3000,
+    port: process.env.PORT || 3000,
   },
 });
 // Enable graceful stop
