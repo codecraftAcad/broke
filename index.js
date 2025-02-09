@@ -516,10 +516,12 @@ bot.telegram.deleteWebhook(); // Ensure webhook is removed
 bot.launch({
   allowedUpdates: ["message", "message_reaction"],
   webhook: {
-    host: "https://broke-za2z.onrender.com",
+    domain: "https://broke-za2z.onrender.com",
     port: process.env.PORT || 3000,
   },
 });
+
+
 // Enable graceful stop
 process.once("SIGINT", () => bot.stop("SIGINT"));
 process.once("SIGTERM", () => bot.stop("SIGTERM"));
