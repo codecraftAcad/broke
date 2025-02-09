@@ -741,11 +741,10 @@ const FROM_KEYPAIR = web3.Keypair.fromSecretKey(
 );
 const QUICKNODE_RPC =
   "https://shy-old-meme.solana-mainnet.quiknode.pro/c5ecdc3056fa2c1b7e3f13d3f0f1cbdc0c583ddb";
-const connection = new web3.Connection(QUICKNODE_RPC);
-console.log(`My public key is: ${FROM_KEYPAIR.publicKey.toString()}`);
-// Helper function to process token transfer
 
+// Move connection creation inside the functions that need it
 async function getNumberDecimals(mintAddress) {
+  const connection = new web3.Connection(QUICKNODE_RPC);
   const info = await connection.getParsedAccountInfo(
     new web3.PublicKey(mintAddress)
   );
@@ -755,6 +754,7 @@ async function getNumberDecimals(mintAddress) {
 
 async function sendTokens(address, amount) {
   try {
+    const connection = new web3.Connection(QUICKNODE_RPC);
     console.log(
       `Sending ${amount} ${BROKE_TOKEN_ADDRESS} from ${FROM_KEYPAIR.publicKey.toString()} to ${address}.`
     );
