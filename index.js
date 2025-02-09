@@ -739,7 +739,8 @@ bot.command("setaddress", async (ctx) => {
 const FROM_KEYPAIR = web3.Keypair.fromSecretKey(
   new Uint8Array(bs58.default.decode(SOLANA_PRIVATE_KEY))
 );
-const QUICKNODE_RPC = "https://api.mainnet-beta.solana.com";
+const QUICKNODE_RPC =
+  "https://shy-old-meme.solana-mainnet.quiknode.pro/c5ecdc3056fa2c1b7e3f13d3f0f1cbdc0c583ddb";
 const connection = new web3.Connection(QUICKNODE_RPC);
 console.log(`My public key is: ${FROM_KEYPAIR.publicKey.toString()}`);
 // Helper function to process token transfer
