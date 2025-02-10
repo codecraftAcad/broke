@@ -23,6 +23,7 @@ model User {
   leaderboardPoints Int @default(0)
   lastStatusMessageId String?
   solanaAddress String?
+  activities Activity[]
   reactions Reaction[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -37,5 +38,18 @@ model Reaction {
   createdAt DateTime @default(now())
 
   @@unique([messageId, reactorId, userId])
+}
+
+model Activity {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+  userId String @db.ObjectId
+  user User @relation(fields: [userId], references: [id])
+  type String  // e.g., "daily_check", "reaction", "rumble_win", "roulette", "withdraw"
+  action String // e.g., "earned", "lost", "won", "withdrew"
+  amount Int   // points earned/lost
+  previousBalance Int // User's balance before the activity
+  newBalance Int     // User's balance after the activity
+  metadata Json?    // Additional details
+  createdAt DateTime @default(now())
 }
 

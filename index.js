@@ -156,6 +156,32 @@ bot.start(async (ctx) => {
   }
 });
 
+// Helper function to log activity with more details
+async function logActivity(
+  userId,
+  type,
+  action,
+  amount,
+  previousBalance,
+  metadata = {}
+) {
+  try {
+    await prisma.activity.create({
+      data: {
+        userId,
+        type,
+        action,
+        amount,
+        previousBalance,
+        newBalance: previousBalance + amount,
+        metadata,
+      },
+    });
+  } catch (error) {
+    console.error("Failed to log activity:", error);
+  }
+}
+
 bot.command("howbrokeami", async (ctx) => {
   const tgId = ctx.from.id.toString();
   const user = await prisma.user.findUnique({
@@ -183,6 +209,7 @@ bot.command("howbrokeami", async (ctx) => {
   const newStatus =
     brokeStatuses[Math.floor(Math.random() * brokeStatuses.length)];
   const pointsEarned = 10000;
+  const previousBalance = user.leaderboardPoints;
 
   // Send status message and store the message ID
   const statusMessage = await ctx.reply(
@@ -203,10 +230,23 @@ bot.command("howbrokeami", async (ctx) => {
     data: {
       brokeStatus: newStatus,
       lastBrokeCheck: now,
-      leaderboardPoints: user.leaderboardPoints + pointsEarned,
+      leaderboardPoints: previousBalance + pointsEarned,
       lastStatusMessageId: statusMessage.message_id.toString(),
     },
   });
+
+  // Log activity
+  await logActivity(
+    user.id,
+    "daily_check",
+    "earned",
+    pointsEarned,
+    previousBalance,
+    {
+      status: newStatus,
+      timestamp: now,
+    }
+  );
 });
 
 bot.command("leaderboard", async (ctx) => {
@@ -315,7 +355,7 @@ const commands = [
   },
   {
     command: "addpoints",
-    description: "Admin command to add points 👑",
+    description: "Admin command to add points ��",
     hide: true,
   },
   {
@@ -391,132 +431,6 @@ async function convertPointsToTokens() {
     console.error("Token conversion error:", error);
   }
 }
-
-// Handle message reactions for points
-bot.on("message_reaction", async (ctx) => {
-  console.log("message_reaction received");
-  try {
-    const reaction = ctx.update.message_reaction;
-    console.log("Full reaction update:", JSON.stringify(reaction, null, 2));
-    console.log("Reaction message ID:", reaction.message_id);
-
-    // Only process when new reactions are added
-    if (
-      reaction.old_reaction.length === 0 &&
-      reaction.new_reaction.length > 0
-    ) {
-      // Get all users who had a status check in the last 24 hours
-      const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-      const recentUsers = await prisma.user.findMany({
-        where: {
-          lastBrokeCheck: {
-            gte: oneDayAgo,
-          },
-        },
-      });
-
-      console.log(
-        "Recent users:",
-        recentUsers.map((u) => ({
-          username: u.username,
-          lastStatusMessageId: u.lastStatusMessageId,
-        }))
-      );
-
-      // Find the user whose last status message matches this one
-      const statusAuthor = recentUsers.find(
-        (user) => user.lastStatusMessageId === reaction.message_id.toString()
-      );
-
-      console.log("Found status author:", statusAuthor);
-
-      // If no user found with this message ID, it's not a broke status message
-      if (!statusAuthor) {
-        console.log(
-          "No status author found for message ID:",
-          reaction.message_id
-        );
-        return;
-      }
-
-      const reactorId = reaction.user.id.toString();
-      console.log("Reactor ID:", reactorId);
-      console.log("Status Author ID:", statusAuthor.tgId);
-
-      // Don't count self-reactions
-      if (statusAuthor.tgId === reactorId) {
-        console.log("Self-reaction detected, ignoring");
-        return;
-      }
-
-      // Check if this reactor has already reacted to this user's message today
-      const today = new Date();
-      today.setHours(0, 0, 0, 0); // Start of today
-
-      const existingReaction = await prisma.reaction.findFirst({
-        where: {
-          messageId: reaction.message_id.toString(),
-          reactorId: reactorId,
-          userId: statusAuthor.id,
-          createdAt: {
-            gte: today, // Only check reactions from today
-          },
-        },
-      });
-
-      if (existingReaction) {
-        console.log("Duplicate reaction detected today, ignoring");
-        return;
-      }
-
-      const pointsPerReaction = 2500;
-
-      // Create reaction record
-      await prisma.reaction.create({
-        data: {
-          messageId: reaction.message_id.toString(),
-          reactorId: reactorId,
-          userId: statusAuthor.id,
-          createdAt: new Date(), // This will be used to check daily limits
-        },
-      });
-
-      // Update points for the status author
-      await prisma.user.update({
-        where: { tgId: statusAuthor.tgId },
-        data: {
-          leaderboardPoints: {
-            increment: pointsPerReaction,
-          },
-        },
-      });
-
-      console.log("Points updated for user:", statusAuthor.username);
-
-      // Notify the user
-      try {
-        const notificationMessage =
-          `✨ @${reaction.user.username} reacted to your broke status!\n` +
-          `You earned ${pointsPerReaction} points! 🎉\n` +
-          `Reaction: ${reaction.new_reaction[0].emoji}`;
-
-        console.log("Sending notification to:", statusAuthor.tgId);
-        console.log("Notification message:", notificationMessage);
-
-        await bot.telegram.sendMessage(statusAuthor.tgId, notificationMessage);
-
-        console.log("Notification sent successfully");
-      } catch (error) {
-        console.error("Failed to notify user:", error);
-        console.error("User ID:", statusAuthor.tgId);
-        console.error("Error details:", error.message);
-      }
-    }
-  } catch (error) {
-    console.error("Reaction handling error:", error);
-    console.error("Full error:", error.stack);
-  }
-});
 
 // Schedule weekly token conversion (every Sunday at 00:00)
 const schedule = require("node-schedule");
@@ -623,6 +537,23 @@ bot.command("brokeroulette", async (ctx) => {
             ? "\nPro tip: Maybe try being less broke next time! 😅"
             : "\nDon't spend it all in one place! 🎰"
         }`
+    );
+
+    // Log activity
+    const previousBalance = user.leaderboardPoints;
+    await logActivity(
+      user.id,
+      "roulette",
+      outcome === "win" ? "won" : "lost",
+      pointChange,
+      previousBalance,
+      {
+        betAmount,
+        outcome,
+        multiplier,
+        timestamp: new Date(),
+        finalBalance: previousBalance + pointChange,
+      }
     );
   } catch (error) {
     console.error("Broke Roulette error:", error);
@@ -907,6 +838,22 @@ bot.command("withdraw", async (ctx) => {
           },
         },
       });
+
+      // Log activity
+      const previousBalance = user.brokeTokens;
+      await logActivity(
+        user.id,
+        "withdraw",
+        "withdrew",
+        -amount,
+        previousBalance,
+        {
+          solanaAddress: user.solanaAddress,
+          transactionHash: signature,
+          timestamp: new Date(),
+          remainingBalance: previousBalance - amount,
+        }
+      );
 
       // Send success message with transaction link
       await ctx.reply(
@@ -1286,6 +1233,18 @@ async function startRumble(ctx) {
           increment: 25000,
         },
       },
+    });
+
+    // Log activity
+    const previousBalance = winner.leaderboardPoints;
+    await logActivity(winner.id, "rumble", "won", 25000, previousBalance, {
+      totalPlayers: activeRumble.players.length,
+      participants: activeRumble.players.map((p) => ({
+        username: p.username,
+        id: p.id,
+      })),
+      timestamp: new Date(),
+      gameLength: Date.now() - rumbleStartTime,
     });
 
     // Clear active rumble
