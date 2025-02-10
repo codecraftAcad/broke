@@ -888,7 +888,7 @@ bot.command("withdraw", async (ctx) => {
       return ctx.reply(
         "❌ Please specify amount to withdraw!\n\n" +
           "Usage: /withdraw <amount>\n" +
-          "Example: /withdraw 1000\n\n` +
+          "Example: /withdraw 1000\n\n" +
           `Available balance: ${user.brokeTokens} $BROKE`
       );
     }
