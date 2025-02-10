@@ -498,7 +498,7 @@ function getRouletteOutcome() {
   
   // Relative probabilities within winning outcomes
   if (winRand < 0.04) return { value: 5, chance: 0.02 };   // 4% of 50% = 2% total
-  if (winRand < 0.20) return { value: 1, chance: 0.08 };   // 16% of 50% = 8% total
+  // if (winRand < 0.20) return { value: 1, chance: 0.08 };   // 16% of 50% = 8% total
   if (winRand < 0.40) return { value: 2, chance: 0.15 }; // 30% of 50% = 15% total
   return { value: 0.5, chance: 0.25 };                        // 50% of 50% = 25% total
 }
