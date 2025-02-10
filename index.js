@@ -133,7 +133,7 @@ bot.start(async (ctx) => {
     await prisma.user.create({
       data: {
         tgId: tgId,
-        username: username,
+        username: username || "",
       },
     });
     ctx.reply(
