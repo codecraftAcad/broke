@@ -464,15 +464,15 @@ const schedule = require("node-schedule");
 schedule.scheduleJob("0 0 * * 0", convertPointsToTokens);
 
 bot.telegram.deleteWebhook(); // Ensure webhook is removed
-// bot.launch({
-//   allowedUpdates: ["message", "message_reaction"],
-//   webhook: {
-//     domain: "https://broke-za2z.onrender.com",
-//     port: process.env.PORT || 3000,
-//   },
-// });
+bot.launch({
+  allowedUpdates: ["message", "message_reaction"],
+  webhook: {
+    domain: "https://broke-za2z.onrender.com",
+    port: process.env.PORT || 3000,
+  },
+});
 
-bot.launch();
+// bot.launch();
 
 // Enable graceful stop
 process.once("SIGINT", () => bot.stop("SIGINT"));
