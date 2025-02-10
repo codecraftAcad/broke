@@ -1040,7 +1040,7 @@ bot.command("join", async (ctx) => {
 
     const player = {
       id: ctx.from.id.toString(),
-      username: ctx.from.username,
+      username: ctx.from.username || ctx.from.first_name,
     };
 
     // Check if player already joined
