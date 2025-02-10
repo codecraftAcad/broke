@@ -477,45 +477,30 @@ process.once("SIGTERM", () => bot.stop("SIGTERM"));
 // Roulette configuration
 const ROULETTE_CONFIG = {
   multipliers: [
-    { value: 5, chance: 0.02 }, // 2% chance for 5x
-    { value: 3, chance: 0.08 }, // 8% chance for 3x
-    { value: 2, chance: 0.25 }, // 25% chance for 2x
-    { value: 1.5, chance: 0.15 }, // 15% chance for 1.5x
-    { value: 0, chance: 0.5 }, // 50% chance to lose
+    { value: 5, chance: 0.02 },  // 2%
+    { value: 3, chance: 0.08 },  // 8%
+    { value: 2, chance: 0.25 },  // 25%
+    { value: 1.5, chance: 0.15 }, // 15%
+    { value: 0, chance: 0.5 },   // 50%
   ],
 };
 
-// Complex RNG function using multiple sources of entropy
-function generateRandomNumber() {
-  const timestamp = Date.now();
-  const random1 = Math.random();
-  const random2 = Math.random();
-  const random3 = Math.random();
-
-  // Combine multiple sources of randomness
-  const combined =
-    ((timestamp % 1000) / 1000) * 0.4 + // Time-based component (40%)
-    random1 * 0.3 + // First random (30%)
-    random2 * 0.2 + // Second random (20%)
-    random3 * 0.1; // Third random (10%)
-
-  return combined;
-}
-
-// Get roulette outcome based on probability distribution
+// Controlled RNG for roulette
 function getRouletteOutcome() {
-  const rand = generateRandomNumber();
-  let cumulativeProbability = 0;
-
-  for (const outcome of ROULETTE_CONFIG.multipliers) {
-    cumulativeProbability += outcome.chance;
-    if (rand < cumulativeProbability) {
-      return outcome;
-    }
+  // Force 50% chance of losing first
+  const willLose = Math.random() < 0.5;
+  if (willLose) {
+    return { value: 0, chance: 0.5 };
   }
 
-  // Fallback to losing (should never happen due to probabilities summing to 1)
-  return ROULETTE_CONFIG.multipliers[ROULETTE_CONFIG.multipliers.length - 1];
+  // If not losing, distribute the wins according to their relative probabilities
+  const winRand = Math.random() * 0.5; // Scale to remaining 50%
+  
+  // Relative probabilities within winning outcomes
+  if (winRand < 0.04) return { value: 5, chance: 0.02 };   // 4% of 50% = 2% total
+  if (winRand < 0.20) return { value: 3, chance: 0.08 };   // 16% of 50% = 8% total
+  if (winRand < 0.40) return { value: 1.5, chance: 0.15 }; // 30% of 50% = 15% total
+  return { value: 2, chance: 0.25 };                        // 50% of 50% = 25% total
 }
 
 // Update the brokeroulette command
@@ -903,7 +888,7 @@ bot.command("withdraw", async (ctx) => {
       return ctx.reply(
         "❌ Please specify amount to withdraw!\n\n" +
           "Usage: /withdraw <amount>\n" +
-          "Example: /withdraw 1000\n\n" +
+          "Example: /withdraw 1000\n\n` +
           `Available balance: ${user.brokeTokens} $BROKE`
       );
     }
