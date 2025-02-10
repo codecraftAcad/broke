@@ -1036,6 +1036,7 @@ bot.command("brokerumble", async (ctx) => {
       players: [],
       started: false,
       messageId: null,
+      startTime: Date.now(),
     };
 
     // Announce rumble and wait for players
@@ -1333,7 +1334,7 @@ async function startRumble(ctx) {
         id: p.id,
       })),
       timestamp: new Date(),
-      gameLength: Date.now() - rumbleStartTime,
+      gameLength: Date.now() - (activeRumble.startTime || Date.now()),
     });
 
     // Clear active rumble
