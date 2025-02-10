@@ -23,6 +23,8 @@ model User {
   leaderboardPoints Int @default(0)
   lastStatusMessageId String?
   solanaAddress String?
+  dailyRoulettes Int @default(0)
+  lastRouletteReset DateTime?
   activities Activity[]
   reactions Reaction[]
   createdAt DateTime @default(now())

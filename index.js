@@ -101,6 +101,8 @@ const MIN_PLAYERS = 2;
 const ELIMINATION_DELAY = 3; // seconds between eliminations
 let activeRumble = null;
 
+const DAILY_ROULETTE_LIMIT = 30;
+
 bot.start(async (ctx) => {
   const username = ctx.from.username;
   const tgId = ctx.from.id.toString();
@@ -180,6 +182,27 @@ async function logActivity(
   } catch (error) {
     console.error("Failed to log activity:", error);
   }
+}
+
+// Helper function to check and reset daily roulettes
+async function checkRouletteLimit(user) {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  // Reset counter if it's a new day
+  if (!user.lastRouletteReset || user.lastRouletteReset < today) {
+    await prisma.user.update({
+      where: { tgId: user.tgId },
+      data: {
+        dailyRoulettes: 0,
+        lastRouletteReset: now,
+      },
+    });
+    return true;
+  }
+
+  // Check if user has reached limit
+  return user.dailyRoulettes < DAILY_ROULETTE_LIMIT;
 }
 
 bot.command("howbrokeami", async (ctx) => {
@@ -355,7 +378,7 @@ const commands = [
   },
   {
     command: "addpoints",
-    description: "Admin command to add points ��",
+    description: "Admin command to add points ",
     hide: true,
   },
   {
@@ -451,6 +474,51 @@ bot.launch({
 process.once("SIGINT", () => bot.stop("SIGINT"));
 process.once("SIGTERM", () => bot.stop("SIGTERM"));
 
+// Roulette configuration
+const ROULETTE_CONFIG = {
+  multipliers: [
+    { value: 5, chance: 0.02 }, // 2% chance for 5x
+    { value: 3, chance: 0.08 }, // 8% chance for 3x
+    { value: 2, chance: 0.25 }, // 25% chance for 2x
+    { value: 1.5, chance: 0.15 }, // 15% chance for 1.5x
+    { value: 0, chance: 0.5 }, // 50% chance to lose
+  ],
+};
+
+// Complex RNG function using multiple sources of entropy
+function generateRandomNumber() {
+  const timestamp = Date.now();
+  const random1 = Math.random();
+  const random2 = Math.random();
+  const random3 = Math.random();
+
+  // Combine multiple sources of randomness
+  const combined =
+    ((timestamp % 1000) / 1000) * 0.4 + // Time-based component (40%)
+    random1 * 0.3 + // First random (30%)
+    random2 * 0.2 + // Second random (20%)
+    random3 * 0.1; // Third random (10%)
+
+  return combined;
+}
+
+// Get roulette outcome based on probability distribution
+function getRouletteOutcome() {
+  const rand = generateRandomNumber();
+  let cumulativeProbability = 0;
+
+  for (const outcome of ROULETTE_CONFIG.multipliers) {
+    cumulativeProbability += outcome.chance;
+    if (rand < cumulativeProbability) {
+      return outcome;
+    }
+  }
+
+  // Fallback to losing (should never happen due to probabilities summing to 1)
+  return ROULETTE_CONFIG.multipliers[ROULETTE_CONFIG.multipliers.length - 1];
+}
+
+// Update the brokeroulette command
 bot.command("brokeroulette", async (ctx) => {
   try {
     const tgId = ctx.from.id.toString();
@@ -459,7 +527,32 @@ bot.command("brokeroulette", async (ctx) => {
     });
 
     if (!user) {
-      return ctx.reply("Please use /start to register first! 📝");
+      return ctx.reply("Please use /start to register first!");
+    }
+
+    // Check if user is admin
+    const isAdmin = ADMIN_IDS.includes(tgId);
+
+    // Check roulette limit for non-admins
+    if (!isAdmin) {
+      const canPlay = await checkRouletteLimit(user);
+      if (!canPlay) {
+        const nextReset = new Date();
+        nextReset.setDate(nextReset.getDate() + 1);
+        nextReset.setHours(0, 0, 0, 0);
+        const timeLeft = nextReset - new Date();
+        const hoursLeft = Math.floor(timeLeft / (1000 * 60 * 60));
+        const minutesLeft = Math.floor(
+          (timeLeft % (1000 * 60 * 60)) / (1000 * 60)
+        );
+
+        return ctx.reply(
+          `❌ Daily roulette limit reached!\n\n` +
+            `You've played ${DAILY_ROULETTE_LIMIT} times today.\n` +
+            `Time until reset: ${hoursLeft}h ${minutesLeft}m\n\n` +
+            `💫 Try again tomorrow!`
+        );
+      }
     }
 
     // Get bet amount from command arguments
@@ -470,10 +563,12 @@ bot.command("brokeroulette", async (ctx) => {
     if (!betAmount || isNaN(betAmount) || betAmount <= 0) {
       return ctx.reply(
         `❌ Please specify a valid bet amount!\n\n` +
-          `Usage: /brokeroulette@brokiesbrokebot <amount>\n\n` +
+          `Usage: /brokeroulette <amount>\n\n` +
           `🎲 Odds:\n` +
-          `• 40% chance to win 2x your bet\n` +
-          `• 10% chance to win 5x your bet\n` +
+          `• 2% chance to win 5x your bet\n` +
+          `• 8% chance to win 3x your bet\n` +
+          `• 25% chance to win 2x your bet\n` +
+          `• 15% chance to win 1.5x your bet\n` +
           `• 50% chance to lose your bet\n\n` +
           `Current points: ${user.leaderboardPoints} 💫`
       );
@@ -486,24 +581,17 @@ bot.command("brokeroulette", async (ctx) => {
       );
     }
 
-    // Generate random number for outcome
-    const chance = Math.random();
-    let multiplier = 0;
-    let outcome = "lose";
-
-    if (chance < 0.4) {
-      // 40% chance to win 2x
-      multiplier = 2;
-      outcome = "win";
-    } else if (chance < 0.5) {
-      // 10% chance to win 5x
-      multiplier = 5;
-      outcome = "win";
-    }
-    // else: 50% chance to lose (multiplier stays 0)
+    // Get outcome
+    const outcome = getRouletteOutcome();
+    const multiplier = outcome.value;
+    const won = multiplier > 0;
 
     // Calculate point change
-    const pointChange = outcome === "win" ? betAmount * multiplier : -betAmount;
+    const pointChange = won
+      ? Math.floor(betAmount * multiplier) - betAmount // Subtract original bet if won
+      : -betAmount; // Lose bet amount
+
+    const previousBalance = user.leaderboardPoints;
 
     // Update user points
     await prisma.user.update({
@@ -515,49 +603,65 @@ bot.command("brokeroulette", async (ctx) => {
       },
     });
 
-    // Get random result message
-    const resultMessage =
-      rouletteResults[outcome][
-        Math.floor(Math.random() * rouletteResults[outcome].length)
-      ];
+    // Generate result message
+    const resultMessage = won
+      ? rouletteResults.win[
+          Math.floor(Math.random() * rouletteResults.win.length)
+        ]
+      : rouletteResults.lose[
+          Math.floor(Math.random() * rouletteResults.lose.length)
+        ];
 
-    // Send result message
+    // After successful roulette, increment counter for non-admins
+    if (!isAdmin) {
+      await prisma.user.update({
+        where: { tgId: user.tgId },
+        data: {
+          dailyRoulettes: {
+            increment: 1,
+          },
+        },
+      });
+    }
+
+    // Add remaining plays to result message for non-admins
+    const playsLeft = isAdmin
+      ? "∞"
+      : DAILY_ROULETTE_LIMIT - (user.dailyRoulettes + 1);
+
     await ctx.reply(
-      `🎲 BROKE ROULETTE 🎲\n` +
-        `━━━━━━━━━━━━━━━━━\n` +
-        `${resultMessage} @${user.username}\n\n` +
+      `🎲 BROKE ROULETTE RESULT 🎲\n` +
+        `━━━━━━━━━━━━━━━━━\n\n` +
+        `${resultMessage}\n\n` +
+        `Bet: ${betAmount} points\n` +
+        `${won ? `Multiplier: ${multiplier}x\n` : ""}` +
         `${
-          outcome === "win"
-            ? `🎉 You won ${pointChange} points! (${multiplier}x)`
-            : `💸 You lost ${betAmount} points!`
-        }\n\n` +
-        `New balance: ${user.leaderboardPoints + pointChange} points 💫\n` +
-        `${
-          outcome === "lose"
-            ? "\nPro tip: Maybe try being less broke next time! 😅"
-            : "\nDon't spend it all in one place! 🎰"
-        }`
+          won
+            ? `Won: ${pointChange + betAmount} points\n`
+            : "Lost: " + betAmount + " points\n"
+        }` +
+        `New balance: ${previousBalance + pointChange} points 💫\n\n` +
+        `Plays remaining today: ${playsLeft}`
     );
 
     // Log activity
-    const previousBalance = user.leaderboardPoints;
     await logActivity(
       user.id,
       "roulette",
-      outcome === "win" ? "won" : "lost",
+      won ? "won" : "lost",
       pointChange,
       previousBalance,
       {
         betAmount,
-        outcome,
         multiplier,
+        outcome: won ? "win" : "lose",
         timestamp: new Date(),
         finalBalance: previousBalance + pointChange,
       }
     );
   } catch (error) {
-    console.error("Broke Roulette error:", error);
-    ctx.reply("Something went wrong with the roulette! Try again later 😅");
+    console.error("Roulette error:", error);
+    ctx.reply("❌ Something went wrong! Please try again later.");
   }
 });
 
