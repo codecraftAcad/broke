@@ -477,11 +477,11 @@ process.once("SIGTERM", () => bot.stop("SIGTERM"));
 // Roulette configuration
 const ROULETTE_CONFIG = {
   multipliers: [
-    { value: 5, chance: 0.02 },  // 2%
-    { value: 3, chance: 0.08 },  // 8%
-    { value: 2, chance: 0.25 },  // 25%
+    { value: 5, chance: 0.02 }, // 2%
+    { value: 3, chance: 0.08 }, // 8%
+    { value: 2, chance: 0.25 }, // 25%
     { value: 1.5, chance: 0.15 }, // 15%
-    { value: 0, chance: 0.5 },   // 50%
+    { value: 0, chance: 0.5 }, // 50%
   ],
 };
 
@@ -495,12 +495,12 @@ function getRouletteOutcome() {
 
   // If not losing, distribute the wins according to their relative probabilities
   const winRand = Math.random() * 0.5; // Scale to remaining 50%
-  
+
   // Relative probabilities within winning outcomes
-  if (winRand < 0.04) return { value: 5, chance: 0.02 };   // 4% of 50% = 2% total
-  if (winRand < 0.20) return { value: 1, chance: 0.08 };   // 16% of 50% = 8% total
-  if (winRand < 0.40) return { value: 2, chance: 0.15 }; // 30% of 50% = 15% total
-  return { value: 0.5, chance: 0.25 };                        // 50% of 50% = 25% total
+  if (winRand < 0.04) return { value: 5, chance: 0.02 }; // 4% of 50% = 2% total
+  if (winRand < 0.2) return { value: 1, chance: 0.08 }; // 16% of 50% = 8% total
+  if (winRand < 0.4) return { value: 2, chance: 0.15 }; // 30% of 50% = 15% total
+  return { value: 0.5, chance: 0.25 }; // 50% of 50% = 25% total
 }
 
 // Update the brokeroulette command
@@ -1308,14 +1308,19 @@ async function startRumble(ctx) {
 
     // Announce winner
     const winner = players[0];
-    await ctx.reply(
-      `🎉 BROKE RUMBLE WINNER! 🎉\n` +
-        `━━━━━━━━━━━━━━━━━\n\n` +
-        `${getRandomMessage("winner", { winner: winner.username })}\n` +
-        `Prize: 25000 broke points 💰`
-    );
 
-    // Award points to winner
+    // Fetch full user data for the winner
+    const winnerData = await prisma.user.findUnique({
+      where: { tgId: winner.id },
+    });
+
+    if (!winnerData) {
+      throw new Error("Winner data not found");
+    }
+
+    const previousBalance = winnerData.leaderboardPoints;
+
+    // Update points
     await prisma.user.update({
       where: { tgId: winner.id },
       data: {
@@ -1325,9 +1330,15 @@ async function startRumble(ctx) {
       },
     });
 
-    // Log activity
-    const previousBalance = winner.leaderboardPoints;
-    await logActivity(winner.id, "rumble", "won", 25000, previousBalance, {
+    await ctx.reply(
+      `🎉 BROKE RUMBLE WINNER! 🎉\n` +
+        `━━━━━━━━━━━━━━━━━\n\n` +
+        `${getRandomMessage("winner", { winner: winner.username })}\n` +
+        `Prize: 25000 broke points 💰`
+    );
+
+    // Log activity with correct balance
+    await logActivity(winnerData.id, "rumble", "won", 25000, previousBalance, {
       totalPlayers: activeRumble.players.length,
       participants: activeRumble.players.map((p) => ({
         username: p.username,
@@ -1335,6 +1346,7 @@ async function startRumble(ctx) {
       })),
       timestamp: new Date(),
       gameLength: Date.now() - (activeRumble.startTime || Date.now()),
+      previousBalance,
     });
 
     // Clear active rumble
