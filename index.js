@@ -96,6 +96,11 @@ const ADMIN_IDS = ["2146305061", "6561256541"]; // Add your Telegram ID here
 const SOLANA_PRIVATE_KEY = process.env.SOLANA_PRIVATE_KEY;
 const BROKE_TOKEN_ADDRESS = process.env.BROKE_TOKEN_ADDRESS;
 
+const RUMBLE_DURATION = 30; // seconds to join
+const MIN_PLAYERS = 2;
+const ELIMINATION_DELAY = 3; // seconds between eliminations
+let activeRumble = null;
+
 bot.start(async (ctx) => {
   const username = ctx.from.username;
   const tgId = ctx.from.id.toString();
@@ -111,6 +116,7 @@ bot.start(async (ctx) => {
     `🎲 /howbrokeami - Check your daily broke status (+10000 points)\n` +
     `📊 /leaderboard - See the brokest of the broke\n` +
     `🎰 /brokeroulette - Gamble your points (if you dare)\n\n` +
+    `🏆 /brokerumble - Join the broke rumble (25000 points)\n\n` +
     `💫 How to Earn Points:\n` +
     `━━━━━━━━━━━━━━━━━\n` +
     `➤ Daily broke check: +10000 points\n` +
@@ -325,6 +331,10 @@ const commands = [
     description: "Process withdrawal requests 💼",
     hide: true,
   },
+  {
+    command: "brokerumble",
+    description: "Join the broke rumble (25000 points) 🏆",
+  },
 ];
 
 // Set commands when bot starts
@@ -521,6 +531,7 @@ bot.launch({
   },
 });
 
+// bot.launch();
 
 // Enable graceful stop
 process.once("SIGINT", () => bot.stop("SIGINT"));
@@ -975,3 +986,313 @@ bot.command("processwithdraw", async (ctx) => {
     ctx.reply("❌ Something went wrong! Please try again later.");
   }
 });
+
+// Add the rumble command
+bot.command("brokerumble", async (ctx) => {
+  try {
+    // Check if there's already an active rumble
+    if (activeRumble) {
+      return ctx.reply("❌ A Broke Rumble is already in progress!");
+    }
+
+    // Initialize new rumble
+    activeRumble = {
+      players: [],
+      started: false,
+      messageId: null,
+    };
+
+    // Announce rumble and wait for players
+    const message = await ctx.reply(
+      `🏆 BROKE RUMBLE STARTING! 🏆\n` +
+        `━━━━━━━━━━━━━━━━━\n\n` +
+        `💰 Prize: 25000 broke points\n` +
+        `⏳ Time to join: ${RUMBLE_DURATION} seconds\n\n` +
+        `Reply with /join to enter!\n\n` +
+        `Players (0): None`
+    );
+
+    activeRumble.messageId = message.message_id;
+
+    // Start timer for joining period
+    setTimeout(async () => {
+      if (activeRumble?.players.length < MIN_PLAYERS) {
+        ctx.reply("❌ Not enough players joined! Rumble cancelled.");
+        activeRumble = null;
+        return;
+      }
+
+      await startRumble(ctx);
+    }, RUMBLE_DURATION * 1000);
+  } catch (error) {
+    console.error("Rumble error:", error);
+    ctx.reply("❌ Failed to start Rumble!");
+    activeRumble = null;
+  }
+});
+
+// Add the join command
+bot.command("join", async (ctx) => {
+  try {
+    if (!activeRumble || activeRumble.started) {
+      return;
+    }
+
+    const player = {
+      id: ctx.from.id.toString(),
+      username: ctx.from.username,
+    };
+
+    // Check if player already joined
+    if (activeRumble.players.some((p) => p.id === player.id)) {
+      return;
+    }
+
+    // Add player and show join message
+    activeRumble.players.push(player);
+    await ctx.reply(getRandomMessage("join", { username: player.username }));
+
+    // Update announcement message
+    await ctx.telegram.editMessageText(
+      ctx.chat.id,
+      activeRumble.messageId,
+      null,
+      `🏆 BROKE RUMBLE STARTING! 🏆\n` +
+        `━━━━━━━━━━━━━━━━━\n\n` +
+        `💰 Prize: 25000 broke points\n` +
+        `⏳ Time to join: ${RUMBLE_DURATION} seconds\n\n` +
+        `Reply with /join@brokiesbrokebot to enter!\n\n` +
+        `Players (${activeRumble.players.length}): \n` +
+        activeRumble.players.map((p) => `• @${p.username}`).join("\n")
+    );
+  } catch (error) {
+    console.error("Join error:", error);
+  }
+});
+
+// Message categories for the rumble
+const rumbleMessages = {
+  join: [
+    "🎮 @{username} joins with a bag full of $BROKE!",
+    "💸 @{username} appears, ready to stack more $BROKE!",
+    "🎯 @{username} enters the arena of financial glory!",
+    "🚀 @{username} apes in, sensing the next $BROKE pump!",
+    "💰 @{username} joins with diamond hands and a $BROKE mindset!",
+  ],
+
+  attack: [
+    "💸 @{attacker} dumps their SafeElonMoonDoge on @{target}! -{damage} HP!",
+    "📉 @{attacker} shows @{target} their competitor's floor price! -{damage} HP!",
+    "🏦 @{attacker} reveals @{target}'s non-$BROKE trading history! -{damage} HP!",
+    "💰 @{attacker} makes @{target} FOMO into a non-$BROKE token! -{damage} HP!",
+    "🔥 @{attacker} exposes @{target}'s paper hands on Reddit! -{damage} HP!",
+    "🚀 @{attacker} tricks @{target} into shorting $BROKE! -{damage} HP!",
+    "💀 @{attacker} makes @{target} trade against the trend! -{damage} HP!",
+    "🎰 @{attacker} gives @{target} anti-$BROKE advice! -{damage} HP!",
+    "🎯 @{attacker} shows @{target} their NFT collection! -{damage} HP!",
+    "🌪️ @{attacker} liquidates @{target}'s leveraged position! -{damage} HP!",
+    "🎪 @{attacker} makes @{target} buy high and sell low! -{damage} HP!",
+    "🔮 @{attacker} gives @{target} financial advice from TikTok! -{damage} HP!",
+    "💩 @{attacker} rugs @{target}'s favorite project! -{damage} HP!",
+    "🎭 @{attacker} makes @{target} FOMO into a dead coin! -{damage} HP!",
+    "🌋 @{attacker} shows @{target} their portfolio performance! -{damage} HP!",
+    "🎪 @{attacker} makes @{target} trade with emotion! -{damage} HP!",
+    "🎯 @{attacker} convinces @{target} to sell at the bottom! -{damage} HP!",
+    "🔥 @{attacker} shows @{target} their unrealized losses! -{damage} HP!",
+  ],
+
+  special: [
+    "🌟 @{username} discovers their old $BROKE stash... +{heal} HP from staking rewards!",
+    "🎲 @{username} flips other tokens for more $BROKE... +{heal} HP from profits!",
+    "💫 @{username} finds extra $BROKE in their wallet... +{heal} HP restored!",
+    "🎭 @{username} gets a surprise $BROKE airdrop... +{heal} HP bonus!",
+    "🌈 @{username} buys the perfect $BROKE dip... +{heal} HP gained!",
+    "🎪 @{username} finds a lucky $BROKE penny... +{heal} HP from good fortune!",
+    "🌠 @{username} gets financial advice from a fortune cookie... +{heal} HP restored!",
+    "🎭 @{username} discovers $BROKE under their mattress... +{heal} HP found!",
+    "🎨 @{username} sells their child's crayon art as an NFT for $BROKE... +{heal} HP earned!",
+    "🎲 @{username} wins $BROKE in a game of rock, paper, scissors... +{heal} HP gained!",
+    "🌟 @{username} finds $BROKE in their other pants... +{heal} HP recovered!",
+    "🎪 @{username} sells their rare Pepe collection for $BROKE... +{heal} HP restored!",
+    "🎭 @{username} discovers their grandma was stacking $BROKE... +{heal} HP inherited!",
+    "🌈 @{username} finds $BROKE in their old crypto wallet... +{heal} HP remembered!",
+    "🎲 @{username} gets tipped $BROKE by mistake... +{heal} HP gifted!",
+    "🎨 @{username} trades their lunch money for $BROKE... +{heal} HP sacrificed!",
+    "🎪 @{username} mines $BROKE with their toaster... +{heal} HP generated!",
+    "🌟 @{username} gets $BROKE from their tooth fairy... +{heal} HP blessed!",
+    "🎭 @{username} finds $BROKE in their spam folder... +{heal} HP recovered!",
+    "🎲 @{username} gets $BROKE from their pet hamster's trading account... +{heal} HP gained!",
+  ],
+
+  elimination: [
+    "💥 @{username} sold their $BROKE too early! Eliminated!",
+    "🔥 @{username} followed non-$BROKE signals! Game over!",
+    "💀 @{username} tried trading against $BROKE! Eliminated!",
+    "📉 @{username} didn't buy enough $BROKE! Rekt!",
+    "🚫 @{username} chose the wrong token over $BROKE! Gone!",
+    "💸 @{username} didn't believe in $BROKE! Account zeroed!",
+    "🎰 @{username} traded their $BROKE for a scam! Eliminated!",
+    "🎭 @{username} paper handed their $BROKE bag! Eliminated!",
+    "🌪️ @{username} got liquidated on 100x leverage! Destroyed!",
+    "🎪 @{username} tried to short $BROKE! Rest in pieces!",
+    "🔮 @{username} listened to their cousin's crypto advice! Obliterated!",
+    "💩 @{username} bought ICP at $700! Total destruction!",
+    "🎭 @{username} forgot their seed phrase! Account gone!",
+    "🌋 @{username} sent $BROKE to the wrong address! Eliminated!",
+    "🎪 @{username} tried day trading $BROKE! Account nuked!",
+    "🎯 @{username} FOMOed at the top! Complete wipeout!",
+    "🔥 @{username} stored their $BROKE on FTX! SBF'd!",
+    "🎲 @{username} tried to time the $BROKE market! Rekt!",
+    "🌟 @{username} bought $LUNA 2.0! Do Kwon'd!",
+    "🎭 @{username} kept their $BROKE on a hot wallet! Hacked!",
+    "🎪 @{username} traded $BROKE for DOGE! Much loss!",
+    "🌈 @{username} tried to create $BROKE fork! Failed fork!",
+    "🎲 @{username} forgot to take profits! Portfolio zeroed!",
+    "🎨 @{username} traded with their rent money! Homeless!",
+    "🎭 @{username} tried to compete with $BROKE! Eliminated!",
+    "🌟 @{username} stored keys on Discord! Scammed!",
+    "🎪 @{username} bought BitConnect! Carlos Matos'd!",
+  ],
+
+  finalShowdown: [
+    "⚡ FINAL SHOWDOWN! @{player1} vs @{player2} - Battle of the $BROKE Kings!",
+    "🔥 Two $BROKE warriors remain! @{player1} faces @{player2} in epic combat!",
+    "💫 @{player1} and @{player2} prepare for the ultimate $BROKE battle!",
+    "⚔️ The final $BROKE showdown: @{player1} vs @{player2}!",
+    "🎭 Only one can be the $BROKE champion! @{player1} vs @{player2}!",
+  ],
+
+  winner: [
+    "👑 @{winner} becomes the Ultimate $BROKE Champion!",
+    "🏆 @{winner} masters the art of $BROKE trading!",
+    "💰 @{winner} turns their $BROKE into more $BROKE!",
+    "🌟 @{winner} proves they're the greatest $BROKE holder!",
+    "🎉 @{winner} emerges as the $BROKE victor!",
+    "🚀 @{winner} diamond hands their $BROKE to glory!",
+    "💎 @{winner} becomes a $BROKE legend!",
+  ],
+};
+
+// Helper function to get random message and replace placeholders
+function getRandomMessage(category, replacements = {}) {
+  const messages = rumbleMessages[category];
+  let message = messages[Math.floor(Math.random() * messages.length)];
+
+  // Replace all placeholders in the message
+  Object.entries(replacements).forEach(([key, value]) => {
+    message = message.replace(`{${key}}`, value);
+  });
+
+  return message;
+}
+
+// Helper function to start the rumble
+async function startRumble(ctx) {
+  try {
+    activeRumble.started = true;
+    let players = activeRumble.players.map((p) => ({
+      ...p,
+      hp: 100, // Each player starts with 100 HP
+    }));
+
+    await ctx.reply(
+      `🎮 BROKE RUMBLE HAS BEGUN! 🎮\n` +
+        `━━━━━━━━━━━━━━━━━\n\n` +
+        `💀 ${players.length} $BROKE warriors enter the arena!\n` +
+        `🛑 Only one will become the $BROKE champion!\n\n` +
+        players.map((p) => `• @${p.username} (100 HP)`).join("\n")
+    );
+
+    // Battle loop
+    while (players.length > 1) {
+      // Increased delay between actions to 5 seconds
+      await new Promise((resolve) => setTimeout(resolve, 5000));
+
+      // 20% chance for special healing event
+      if (Math.random() < 0.2) {
+        const luckyPlayer = players[Math.floor(Math.random() * players.length)];
+        const healAmount = Math.floor(Math.random() * 41) + 20; // Heal 20-60 HP
+        luckyPlayer.hp = Math.min(100, luckyPlayer.hp + healAmount); // Cap at 100 HP
+
+        await ctx.reply(
+          getRandomMessage("special", {
+            username: luckyPlayer.username,
+            heal: healAmount,
+          })
+        );
+
+        await ctx.reply(
+          `💚 @${luckyPlayer.username} now has ${luckyPlayer.hp} HP!`
+        );
+        continue; // Skip attack this round
+      }
+
+      // Pick attacker and target
+      const attacker = players[Math.floor(Math.random() * players.length)];
+      const possibleTargets = players.filter(
+        (p) => p.username !== attacker.username
+      );
+      const target =
+        possibleTargets[Math.floor(Math.random() * possibleTargets.length)];
+
+      // Increased damage between 30-100 HP
+      const damage = Math.floor(Math.random() * 71) + 30;
+      target.hp -= damage;
+
+      // Attack message
+      await ctx.reply(
+        getRandomMessage("attack", {
+          attacker: attacker.username,
+          target: target.username,
+          damage: damage,
+        }) + `\n💔 @${target.username} has ${Math.max(target.hp, 0)} HP left!`
+      );
+
+      // Check for elimination
+      if (target.hp <= 0) {
+        await ctx.reply(
+          getRandomMessage("elimination", {
+            username: target.username,
+          })
+        );
+        players = players.filter((p) => p.username !== target.username);
+
+        // Final showdown message when 2 players remain
+        if (players.length === 2) {
+          await ctx.reply(
+            getRandomMessage("finalShowdown", {
+              player1: players[0].username,
+              player2: players[1].username,
+            })
+          );
+        }
+      }
+    }
+
+    // Announce winner
+    const winner = players[0];
+    await ctx.reply(
+      `🎉 BROKE RUMBLE WINNER! 🎉\n` +
+        `━━━━━━━━━━━━━━━━━\n\n` +
+        `${getRandomMessage("winner", { winner: winner.username })}\n` +
+        `Prize: 25000 broke points 💰`
+    );
+
+    // Award points to winner
+    await prisma.user.update({
+      where: { tgId: winner.id },
+      data: {
+        leaderboardPoints: {
+          increment: 25000,
+        },
+      },
+    });
+
+    // Clear active rumble
+    activeRumble = null;
+  } catch (error) {
+    console.error("Rumble error:", error);
+    ctx.reply("❌ The market crashed! Something went wrong during the Rumble!");
+    activeRumble = null;
+  }
+}
