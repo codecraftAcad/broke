@@ -1296,3 +1296,36 @@ async function startRumble(ctx) {
     activeRumble = null;
   }
 }
+
+// Add this middleware after bot initialization but before command handlers
+bot.use(async (ctx, next) => {
+  // Skip check for /start command
+  if (ctx.message?.text?.startsWith("/start")) {
+    return next();
+  }
+
+  try {
+    const tgId = ctx.from?.id?.toString();
+    if (!tgId) return next();
+
+    const user = await prisma.user.findUnique({
+      where: { tgId: tgId },
+    });
+
+    if (!user) {
+      return ctx.reply(
+        `❌ Please register first!\n\n` +
+          `Use /start@brokiesbrokebot to:\n` +
+          `• Create your account\n` +
+          `• Start earning points\n` +
+          `• Join the $BROKE community`
+      );
+    }
+
+    // User is registered, continue to command handler
+    return next();
+  } catch (error) {
+    console.error("Middleware error:", error);
+    return next();
+  }
+});
