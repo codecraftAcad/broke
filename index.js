@@ -550,10 +550,10 @@ bot.command("brokeroulette", async (ctx) => {
         `❌ Please specify a valid bet amount!\n\n` +
           `Usage: /brokeroulette <amount>\n\n` +
           `🎲 Odds:\n` +
-          `• 2% chance to win 5x your bet\n` +
-          `• 8% chance to win 3x your bet\n` +
-          `• 25% chance to win 2x your bet\n` +
-          `• 15% chance to win 1.5x your bet\n` +
+          `• 2% chance to win 5x your bet\n` + 
+          `• 8% chance to win 1x your bet\n` +
+          `• 15% chance to win 2x your bet\n` +
+          `• 25% chance to win 0.5x your bet\n` +
           `• 50% chance to lose your bet\n\n` +
           `Current points: ${user.leaderboardPoints} 💫`
       );
