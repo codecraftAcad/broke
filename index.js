@@ -1306,7 +1306,9 @@ bot.use(async (ctx, next) => {
 
   try {
     const tgId = ctx.from?.id?.toString();
-    if (!tgId) return next();
+    if (!tgId) {
+      return ctx.reply("❌ Invalid request");
+    }
 
     const user = await prisma.user.findUnique({
       where: { tgId: tgId },
@@ -1322,10 +1324,9 @@ bot.use(async (ctx, next) => {
       );
     }
 
-    // User is registered, continue to command handler
     return next();
   } catch (error) {
     console.error("Middleware error:", error);
-    return next();
+    return ctx.reply("❌ Something went wrong. Please try again later.");
   }
 });
