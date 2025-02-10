@@ -398,6 +398,10 @@ const commands = [
     command: "brokerumble",
     description: "Join the broke rumble (25000 points) 🏆",
   },
+  {
+    command: "stats",
+    description: "See your stats 📊",
+  },
 ];
 
 // Set commands when bot starts
@@ -460,15 +464,15 @@ const schedule = require("node-schedule");
 schedule.scheduleJob("0 0 * * 0", convertPointsToTokens);
 
 bot.telegram.deleteWebhook(); // Ensure webhook is removed
-bot.launch({
-  allowedUpdates: ["message", "message_reaction"],
-  webhook: {
-    domain: "https://broke-za2z.onrender.com",
-    port: process.env.PORT || 3000,
-  },
-});
+// bot.launch({
+//   allowedUpdates: ["message", "message_reaction"],
+//   webhook: {
+//     domain: "https://broke-za2z.onrender.com",
+//     port: process.env.PORT || 3000,
+//   },
+// });
 
-// bot.launch();
+bot.launch();
 
 // Enable graceful stop
 process.once("SIGINT", () => bot.stop("SIGINT"));
@@ -550,7 +554,7 @@ bot.command("brokeroulette", async (ctx) => {
         `❌ Please specify a valid bet amount!\n\n` +
           `Usage: /brokeroulette <amount>\n\n` +
           `🎲 Odds:\n` +
-          `• 2% chance to win 5x your bet\n` + 
+          `• 2% chance to win 5x your bet\n` +
           `• 8% chance to win 1x your bet\n` +
           `• 15% chance to win 2x your bet\n` +
           `• 25% chance to win 0.5x your bet\n` +
@@ -1389,5 +1393,116 @@ bot.use(async (ctx, next) => {
   } catch (error) {
     console.error("Middleware error:", error);
     return ctx.reply("❌ Something went wrong. Please try again later.");
+  }
+});
+
+bot.command("stats", async (ctx) => {
+  try {
+    const tgId = ctx.from.id.toString();
+    const user = await prisma.user.findUnique({
+      where: { tgId },
+      include: {
+        activities: true, // Include activities for stats calculation
+      },
+    });
+
+    if (!user) {
+      return ctx.reply("Please use /start to register first!");
+    }
+
+    // Calculate statistics
+    const totalGames = user.activities.filter(
+      (a) => a.type === "roulette"
+    ).length;
+    const totalWins = user.activities.filter(
+      (a) => a.type === "roulette" && a.action === "won"
+    ).length;
+    const totalLosses = user.activities.filter(
+      (a) => a.type === "roulette" && a.action === "lost"
+    ).length;
+    const winRate =
+      totalGames > 0 ? ((totalWins / totalGames) * 100).toFixed(1) : 0;
+
+    const biggestWin = user.activities
+      .filter((a) => a.type === "roulette" && a.action === "won")
+      .reduce((max, curr) => Math.max(max, curr.amount), 0);
+
+    const biggestLoss = user.activities
+      .filter((a) => a.type === "roulette" && a.action === "lost")
+      .reduce((min, curr) => Math.min(min, curr.amount), 0);
+
+    const rumbleWins = user.activities.filter(
+      (a) => a.type === "rumble" && a.action === "won"
+    ).length;
+
+    // Get user's profile photo
+    const photos = await ctx.telegram.getUserProfilePhotos(ctx.from.id, 0, 1);
+    const hasPhoto = photos && photos.total_count > 0;
+
+    // If user has a profile photo, send it with stats
+    if (hasPhoto) {
+      await ctx.replyWithPhoto(photos.photos[0][0].file_id, {
+        caption:
+          `👤 BROKE WARRIOR PROFILE 👤\n` +
+          `━━━━━━━━━━━━━━━━━\n\n` +
+          `🎯 Name: @${user.username}\n` +
+          `💫 Broke Status: ${user.brokeStatus || "Not checked"}\n\n` +
+          `💰 ASSETS:\n` +
+          `• ${user.leaderboardPoints} Points\n` +
+          `• ${user.brokeTokens} $BROKE\n\n` +
+          `🎲 GAMBLING STATS:\n` +
+          `• Games Played: ${totalGames}\n` +
+          `• Wins: ${totalWins}\n` +
+          `• Losses: ${totalLosses}\n` +
+          `• Win Rate: ${winRate}%\n` +
+          `• Biggest Win: ${biggestWin > 0 ? `+${biggestWin}` : 0}\n` +
+          `• Biggest Loss: ${biggestLoss}\n\n` +
+          `👑 ACHIEVEMENTS:\n` +
+          `• Rumble Victories: ${rumbleWins}\n` +
+          `• Daily Streaks: Coming soon!\n\n` +
+          `📈 ACTIVITY:\n` +
+          `• Member Since: ${new Date(user.createdAt).toLocaleDateString()}\n` +
+          `• Last Status: ${
+            user.lastBrokeCheck
+              ? new Date(user.lastBrokeCheck).toLocaleDateString()
+              : "Never"
+          }\n\n` +
+          `Use /brokeroulette to gamble!\n` +
+          `Use /howbrokeami to check status!`,
+      });
+    } else {
+      // If no profile photo, send text only
+      await ctx.reply(
+        `👤 BROKE WARRIOR PROFILE 👤\n` +
+          `━━━━━━━━━━━━━━━━━\n\n` +
+          `🎯 Name: @${user.username}\n` +
+          `💫 Broke Status: ${user.brokeStatus || "Not checked"}\n\n` +
+          `💰 ASSETS:\n` +
+          `• ${user.leaderboardPoints} Points\n` +
+          `• ${user.brokeTokens} $BROKE\n\n` +
+          `🎲 GAMBLING STATS:\n` +
+          `• Games Played: ${totalGames}\n` +
+          `• Wins: ${totalWins}\n` +
+          `• Losses: ${totalLosses}\n` +
+          `• Win Rate: ${winRate}%\n` +
+          `• Biggest Win: ${biggestWin > 0 ? `+${biggestWin}` : 0}\n` +
+          `• Biggest Loss: ${biggestLoss}\n\n` +
+          `👑 ACHIEVEMENTS:\n` +
+          `• Rumble Victories: ${rumbleWins}\n` +
+          `• Daily Streaks: Coming soon!\n\n` +
+          `📈 ACTIVITY:\n` +
+          `• Member Since: ${new Date(user.createdAt).toLocaleDateString()}\n` +
+          `• Last Status: ${
+            user.lastBrokeCheck
+              ? new Date(user.lastBrokeCheck).toLocaleDateString()
+              : "Never"
+          }\n\n` +
+          `Use /brokeroulette to gamble!\n` +
+          `Use /howbrokeami to check status!`
+      );
+    }
+  } catch (error) {
+    console.error("Stats error:", error);
+    ctx.reply("❌ Failed to fetch stats. Please try again later!");
   }
 });
