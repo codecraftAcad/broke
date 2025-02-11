@@ -4,6 +4,8 @@ const prisma = new PrismaClient();
 const web3 = require("@solana/web3.js");
 const splToken = require("@solana/spl-token");
 const bs58 = require("bs58");
+const { GoogleSpreadsheet } = require("google-spreadsheet");
+const { JWT } = require("google-auth-library");
 
 const bot = new Telegraf(process.env.BOT_TOKEN);
 
@@ -102,6 +104,71 @@ const ELIMINATION_DELAY = 3; // seconds between eliminations
 let activeRumble = null;
 
 const DAILY_ROULETTE_LIMIT = 30;
+
+// Format private key correctly
+const PRIVATE_KEY = process.env.GOOGLE_PRIVATE_KEY
+  ? process.env.GOOGLE_PRIVATE_KEY.split(String.raw`\n`).join("\n")
+  : undefined;
+
+const serviceAccountAuth = new JWT({
+  email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+  key: PRIVATE_KEY,
+  scopes: [
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/drive.file",
+  ],
+});
+
+const doc = new GoogleSpreadsheet(
+  process.env.GOOGLE_SHEET_ID,
+  serviceAccountAuth
+);
+
+// Initialize Google Sheets
+async function initializeGoogleSheets() {
+  try {
+    console.log("Attempting to load sheet:", process.env.GOOGLE_SHEET_ID);
+    console.log(
+      "Using service account:",
+      process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL
+    );
+    await doc.loadInfo();
+    console.log("Google Sheets initialized");
+
+    // Get the first sheet
+    let sheet = doc.sheetsByIndex[0];
+
+    console.log("Sheet title:", doc.title);
+  } catch (error) {
+    console.error("Failed to initialize Google Sheets:", error);
+    if (error.response) {
+      console.error("Response error data:", error.response.data);
+      console.error("Response error status:", error.response.status);
+    }
+  }
+}
+
+// Call initialization
+initializeGoogleSheets().catch(console.error);
+
+// Function to log withdrawal request
+async function logWithdrawalRequest(user, amount, address) {
+  try {
+    const sheet = doc.sheetsByIndex[0]; // First sheet
+    await sheet.addRow({
+      timestamp: new Date().toISOString(),
+      username: user.username,
+      tgId: user.tgId,
+      amount: amount,
+      address: address,
+      status: "PENDING",
+      processed: "NO",
+    });
+  } catch (error) {
+    console.error("Failed to log withdrawal:", error);
+    throw error;
+  }
+}
 
 bot.start(async (ctx) => {
   const username = ctx.from.username;
@@ -408,7 +475,7 @@ const commands = [
 bot.telegram
   .setMyCommands(commands.filter((cmd) => !cmd.hide))
   .then(() => {
-    console.log("Bot commands registered successfully! 🚀");
+    console.log("Bot commands registered successfully! ��");
   })
   .catch((error) => {
     console.error("Failed to register bot commands:", error);
@@ -464,22 +531,21 @@ const schedule = require("node-schedule");
 schedule.scheduleJob("0 0 * * 0", convertPointsToTokens);
 
 bot.telegram.deleteWebhook(); // Ensure webhook is removed
-bot.launch({
-  allowedUpdates: ["message", "message_reaction"],
-  webhook: {
-    domain: "https://broke-za2z.onrender.com",
-    port: process.env.PORT || 3000,
-  },
-});
+// bot.launch({
+//   allowedUpdates: ["message", "message_reaction"],
+//   webhook: {
+//     domain: "https://broke-za2z.onrender.com",
+//     port: process.env.PORT || 3000,
+//   },
+// });
 
-// bot.launch();
+bot.launch();
 
 // Enable graceful stop
 process.once("SIGINT", () => bot.stop("SIGINT"));
 process.once("SIGTERM", () => bot.stop("SIGTERM"));
 
 // Roulette configuration
-
 
 // Controlled RNG for roulette
 function getRouletteOutcome() {
@@ -552,6 +618,7 @@ bot.command("brokeroulette", async (ctx) => {
           `• 10% chance to win 2x your bet\n` +
           `• 15% chance to win 1.5x your bet\n` +
           `• 15% chance to break even - safe\n` +
+          `• 50% chance to lose your bet\n` +
           `• 50% chance to lose your bet\n\n` +
           `Current points: ${user.leaderboardPoints} 💫`
       );
@@ -783,66 +850,45 @@ async function getNumberDecimals(mintAddress) {
   return result;
 }
 
+const axios = require("axios");
+
 async function sendTokens(address, amount) {
   try {
-    const connection = new web3.Connection(QUICKNODE_RPC);
     console.log(
       `Sending ${amount} ${BROKE_TOKEN_ADDRESS} from ${FROM_KEYPAIR.publicKey.toString()} to ${address}.`
     );
-    //Step 1
-    console.log(`1 - Getting Source Token Account`);
-    let sourceAccount = await splToken.getOrCreateAssociatedTokenAccount(
-      connection,
-      FROM_KEYPAIR,
-      new web3.PublicKey(BROKE_TOKEN_ADDRESS),
-      FROM_KEYPAIR.publicKey
-    );
-    console.log(`    Source Account: ${sourceAccount.address.toString()}`);
 
-    //Step 2
-    console.log(`2 - Getting Destination Token Account`);
-    let destinationAccount = await splToken.getOrCreateAssociatedTokenAccount(
-      connection,
-      FROM_KEYPAIR,
-      new web3.PublicKey(BROKE_TOKEN_ADDRESS),
-      new web3.PublicKey(address)
-    );
-    console.log(
-      `    Destination Account: ${destinationAccount.address.toString()}`
+    const response = await axios.post(
+      "https://api.tatum.io/v3/blockchain/token/transaction",
+      {
+        chain: "SOL",
+        from: FROM_KEYPAIR.publicKey.toString(),
+        to: address,
+        contractAddress: BROKE_TOKEN_ADDRESS,
+        amount: amount.toString(),
+        digits: await getNumberDecimals(BROKE_TOKEN_ADDRESS),
+        fromPrivateKey: process.env.SOLANA_PRIVATE_KEY,
+      },
+      {
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": process.env.TATUM_APIKEY,
+        },
+      }
     );
 
-    //Step 3
-    console.log(
-      `3 - Fetching Number of Decimals for Mint: ${BROKE_TOKEN_ADDRESS}`
-    );
-    const numberDecimals = await getNumberDecimals(BROKE_TOKEN_ADDRESS);
-    console.log(`    Number of Decimals: ${numberDecimals}`);
-
-    //Step 4
-    console.log(`4 - Creating and Sending Transaction`);
-    const tx = new web3.Transaction();
-    tx.add(
-      splToken.createTransferInstruction(
-        sourceAccount.address,
-        destinationAccount.address,
-        FROM_KEYPAIR.publicKey,
-        amount * Math.pow(10, numberDecimals)
-      )
-    );
-
-    const latestBlockHash = await connection.getLatestBlockhash("confirmed");
-    tx.recentBlockhash = await latestBlockHash.blockhash;
-    const signature = await web3.sendAndConfirmTransaction(connection, tx, [
-      FROM_KEYPAIR,
-    ]);
     console.log(
       "\x1b[32m", //Green Text
       `   Transaction Success!🎉`,
-      `\n    https://explorer.solana.com/tx/${signature}?cluster=mainnet`
+      `\n    https://explorer.solana.com/tx/${response.data.txId.txId}?cluster=mainnet`
     );
-    return signature;
+
+    return response.data.txId.txId;
   } catch (error) {
-    console.error("Token transfer error:", error);
+    console.error(
+      "Token transfer error:",
+      error.response ? error.response.data : error.message
+    );
     throw new Error("Token transfer failed. Please try again later.");
   }
 }
@@ -855,23 +901,13 @@ function isSunday() {
 // Add the withdraw command
 bot.command("withdraw", async (ctx) => {
   try {
-    // Check if it's Sunday
-    if (!isSunday()) {
-      const nextSunday = getNextSundayCountdown();
-      return ctx.reply(
-        `❌ Withdrawals are only possible on Sundays!\n\n` +
-          `⏳ Next withdrawal window in: ${nextSunday}\n\n` +
-          `Note: Your tokens will be converted and available for withdrawal every Sunday.`
-      );
-    }
-
     const tgId = ctx.from.id.toString();
     const user = await prisma.user.findUnique({
       where: { tgId },
     });
 
     if (!user) {
-      return ctx.reply("Please use /start first!");
+      return ctx.reply("Please use /start to register first!");
     }
 
     if (!user.solanaAddress) {
@@ -880,6 +916,15 @@ bot.command("withdraw", async (ctx) => {
       );
     }
 
+    // Check if it's Sunday
+    if (!isSunday()) {
+      const countdown = getNextSundayCountdown();
+      return ctx.reply(
+        `❌ Withdrawals are only available on Sundays!\n\n` +
+          `⏰ Next withdrawal window opens in: ${countdown}\n\n` +
+          `Current balance: ${user.brokeTokens} $BROKE`
+      );
+    }
     // Get amount from command
     const args = ctx.message.text.split(" ");
     if (args.length !== 2) {
@@ -905,60 +950,44 @@ bot.command("withdraw", async (ctx) => {
       );
     }
 
-    // Send processing message
+    // Deduct tokens immediately
+    await prisma.user.update({
+      where: { tgId },
+      data: {
+        brokeTokens: {
+          decrement: amount,
+        },
+      },
+    });
+
+    // Log withdrawal request
+    await logWithdrawalRequest(user, amount, user.solanaAddress);
+
+    // Send confirmation message
     await ctx.reply(
-      `⏳ Processing your withdrawal...\n` +
+      `🏦 WITHDRAWAL REQUEST SUBMITTED! 🏦\n` +
+        `━━━━━━━━━━━━━━━━━\n\n` +
         `Amount: ${amount} $BROKE\n` +
-        `Address: ${user.solanaAddress}`
+        `Address: ${user.solanaAddress}\n\n` +
+        `Status: Processing ⏳\n\n` +
+        `Your withdrawal will be processed shortly.\n` +
+        `You will receive a notification once completed.\n\n` +
+        `New balance: ${user.brokeTokens - amount} $BROKE`
     );
 
-    try {
-      // Process the transfer
-      const signature = await sendTokens(user.solanaAddress, amount);
-
-      // Deduct tokens after successful transfer
-      await prisma.user.update({
-        where: { tgId },
-        data: {
-          brokeTokens: {
-            decrement: amount,
-          },
-        },
-      });
-
-      // Log activity
-      const previousBalance = user.brokeTokens;
-      await logActivity(
-        user.id,
-        "withdraw",
-        "withdrew",
-        -amount,
-        previousBalance,
-        {
-          solanaAddress: user.solanaAddress,
-          transactionHash: signature,
-          timestamp: new Date(),
-          remainingBalance: previousBalance - amount,
-        }
-      );
-
-      // Send success message with transaction link
-      await ctx.reply(
-        `✅ Withdrawal successful!\n\n` +
-          `Amount: ${amount} $BROKE\n` +
-          `Address: ${user.solanaAddress}\n` +
-          `Transaction: https://solscan.io/tx/${signature}\n\n` +
-          `New balance: ${user.brokeTokens - amount} $BROKE\n\n` +
-          `Next withdrawal window: Next Sunday 00:00 UTC`
-      );
-    } catch (error) {
-      console.error("Withdrawal error:", error);
-      await ctx.reply(
-        `❌ Withdrawal failed!\n` +
-          `Please try again later or contact an admin.\n` +
-          `Error: ${error.message}`
-      );
-    }
+    // Log activity
+    await logActivity(
+      user.id,
+      "withdraw",
+      "requested",
+      -amount,
+      user.brokeTokens,
+      {
+        solanaAddress: user.solanaAddress,
+        status: "PENDING",
+        timestamp: new Date(),
+      }
+    );
   } catch (error) {
     console.error("Withdraw error:", error);
     ctx.reply("❌ Something went wrong! Please try again later.");
@@ -1500,5 +1529,151 @@ bot.command("stats", async (ctx) => {
   } catch (error) {
     console.error("Stats error:", error);
     ctx.reply("❌ Failed to fetch stats. Please try again later!");
+  }
+});
+
+// Add this after other initialization code
+let lastCheckedRow = 0;
+
+// Function to check for completed withdrawals
+async function checkCompletedWithdrawals() {
+  console.log("checking the sheets");
+  try {
+    const sheet = doc.sheetsByIndex[0];
+    const rows = await sheet.getRows();
+    console.log("Found rows:", rows.length);
+
+    // Start from where we left off
+    for (let i = lastCheckedRow; i < rows.length; i++) {
+      const row = rows[i];
+
+      // Access data using raw data indices
+      const status = row._rawData[5]; // Status is at index 5
+      const username = row._rawData[1];
+      const tgId = row._rawData[2];
+      const amount = row._rawData[3];
+      const address = row._rawData[4];
+      const txHash = row._rawData[6];
+      const processed = row._rawData[7]; // Check processed status
+
+      // Check if status is COMPLETED and not yet processed
+      if (status === "COMPLETED" && processed === "NO") {
+        console.log(`Processing completed withdrawal for user ${username}`);
+
+        try {
+          // Send notification to user
+          await bot.telegram.sendMessage(
+            tgId,
+            `✅ Withdrawal Completed!\n` +
+              `━━━━━━━━━━━━━━━━━\n\n` +
+              `Amount: ${amount} $BROKE\n` +
+              `Transaction: https://solscan.io/tx/${txHash}\n\n` +
+              `Thank you for using Broke Bot! 🚀`
+          );
+
+          // Update the processed status in the sheet
+          row._rawData[7] = "YES"; // Mark as processed
+          await row.save();
+
+          // Get user from database for activity logging
+          const user = await prisma.user.findUnique({
+            where: { tgId: tgId },
+          });
+
+          if (user) {
+            // Log the completion
+            await logActivity(
+              user.id,
+              "withdraw",
+              "completed",
+              -Number(amount),
+              0,
+              {
+                solanaAddress: address,
+                transactionHash: txHash,
+                timestamp: new Date(),
+              }
+            );
+          }
+
+          console.log(`✅ Processed withdrawal for ${username}`);
+        } catch (error) {
+          console.error(`Failed to process completion for ${username}:`, error);
+        }
+      }
+    }
+
+    // Update last checked position
+    lastCheckedRow = rows.length;
+  } catch (error) {
+    console.error("Failed to check completed withdrawals:", error);
+  }
+}
+
+// Run the check every minute
+setInterval(checkCompletedWithdrawals, 10 * 1000);
+
+// Also add a command for admins to force check
+bot.command("checkwithdrawals", async (ctx) => {
+  try {
+    const tgId = ctx.from.id.toString();
+    if (!ADMIN_IDS.includes(tgId)) {
+      return;
+    }
+
+    await checkCompletedWithdrawals();
+    ctx.reply("✅ Withdrawal check completed!");
+  } catch (error) {
+    console.error("Check withdrawals error:", error);
+    ctx.reply("❌ Failed to check withdrawals!");
+  }
+});
+
+// Admin command to get total balances
+bot.command("totals", async (ctx) => {
+  try {
+    const tgId = ctx.from.id.toString();
+    if (!ADMIN_IDS.includes(tgId)) {
+      return;
+    }
+
+    // Get all users
+    const users = await prisma.user.findMany();
+
+    // Calculate totals
+    const totalPoints = users.reduce(
+      (sum, user) => sum + user.leaderboardPoints,
+      0
+    );
+    const totalTokens = users.reduce((sum, user) => sum + user.brokeTokens, 0);
+    const totalUsers = users.length;
+    const activeUsers = users.filter((u) => u.lastBrokeCheck).length;
+
+    // Format numbers with commas
+    const formatNumber = (num) =>
+      num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+
+    await ctx.reply(
+      `📊 BROKE BOT STATISTICS 📊\n` +
+        `━━━━━━━━━━━━━━━━━\n\n` +
+        `👥 USERS:\n` +
+        `• Total Users: ${formatNumber(totalUsers)}\n` +
+        `• Active Users: ${formatNumber(activeUsers)}\n\n` +
+        `💰 ECONOMY:\n` +
+        `• Total Points: ${formatNumber(totalPoints)}\n` +
+        `• Total $BROKE: ${formatNumber(totalTokens)}\n\n` +
+        `📈 AVERAGES:\n` +
+        `• Points per User: ${formatNumber(
+          Math.floor(totalPoints / totalUsers)
+        )}\n` +
+        `• $BROKE per User: ${formatNumber(
+          Math.floor(totalTokens / totalUsers)
+        )}\n\n` +
+        `Total Broke to fund: ${formatNumber(totalPoints + totalTokens)}\n\n` + 
+        `Generated: ${new Date().toLocaleString()}`
+    );
+  } catch (error) {
+    console.error("Totals command error:", error);
+    ctx.reply("❌ Failed to fetch totals. Please try again later!");
   }
 });
