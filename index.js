@@ -479,15 +479,7 @@ process.once("SIGINT", () => bot.stop("SIGINT"));
 process.once("SIGTERM", () => bot.stop("SIGTERM"));
 
 // Roulette configuration
-const ROULETTE_CONFIG = {
-  multipliers: [
-    { value: 5, chance: 0.02 }, // 2%
-    { value: 3, chance: 0.08 }, // 8%
-    { value: 2, chance: 0.25 }, // 25%
-    { value: 1.5, chance: 0.15 }, // 15%
-    { value: 0, chance: 0.5 }, // 50%
-  ],
-};
+
 
 // Controlled RNG for roulette
 function getRouletteOutcome() {
@@ -501,10 +493,11 @@ function getRouletteOutcome() {
   const winRand = Math.random() * 0.5; // Scale to remaining 50%
 
   // Relative probabilities within winning outcomes
-  if (winRand < 0.04) return { value: 5, chance: 0.02 }; // 4% of 50% = 2% total
-  if (winRand < 0.2) return { value: 1, chance: 0.08 }; // 16% of 50% = 8% total
-  if (winRand < 0.4) return { value: 2, chance: 0.15 }; // 30% of 50% = 15% total
-  return { value: 0.5, chance: 0.25 }; // 50% of 50% = 25% total
+  if (winRand < 0.04) return { value: 5, chance: 0.02 }; // 2% chance to win 5x
+  if (winRand < 0.2) return { value: 3, chance: 0.08 }; // 8% chance to win 3x
+  if (winRand < 0.4) return { value: 2, chance: 0.1 }; // 10% chance to win 2x
+  if (winRand < 0.7) return { value: 1.5, chance: 0.15 }; // 15% chance to win 1.5x
+  return { value: 1, chance: 0.15 }; // 15% chance to break even
 }
 
 // Update the brokeroulette command
@@ -555,9 +548,10 @@ bot.command("brokeroulette", async (ctx) => {
           `Usage: /brokeroulette <amount>\n\n` +
           `🎲 Odds:\n` +
           `• 2% chance to win 5x your bet\n` +
-          `• 8% chance to win 1x your bet\n` +
-          `• 15% chance to win 2x your bet\n` +
-          `• 25% chance to win 0.5x your bet\n` +
+          `• 8% chance to win 3x your bet\n` +
+          `• 10% chance to win 2x your bet\n` +
+          `• 15% chance to win 1.5x your bet\n` +
+          `• 15% chance to break even - safe\n` +
           `• 50% chance to lose your bet\n\n` +
           `Current points: ${user.leaderboardPoints} 💫`
       );
