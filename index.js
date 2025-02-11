@@ -1611,7 +1611,9 @@ async function checkCompletedWithdrawals() {
 }
 
 // Run the check every minute
-setInterval(checkCompletedWithdrawals, 10 * 1000);
+// Schedule withdrawal checks every 10 seconds
+const schedule = require("node-schedule");
+schedule.scheduleJob("*/10 * * * * *", checkCompletedWithdrawals);
 
 // Also add a command for admins to force check
 bot.command("checkwithdrawals", async (ctx) => {
