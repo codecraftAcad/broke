@@ -1450,6 +1450,8 @@ bot.command("stats", async (ctx) => {
           `💰 ASSETS:\n` +
           `• ${user.leaderboardPoints} Points\n` +
           `• ${user.brokeTokens} $BROKE\n\n` +
+          `💰 WALLET:\n` +
+          `• ${user.solanaAddress}\n\n` +
           `🎲 GAMBLING STATS:\n` +
           `• Games Played: ${totalGames}\n` +
           `• Wins: ${totalWins}\n` +
