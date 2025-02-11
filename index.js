@@ -6,6 +6,7 @@ const splToken = require("@solana/spl-token");
 const bs58 = require("bs58");
 const { GoogleSpreadsheet } = require("google-spreadsheet");
 const { JWT } = require("google-auth-library");
+const schedule = require("node-schedule");
 
 const bot = new Telegraf(process.env.BOT_TOKEN);
 
@@ -527,7 +528,7 @@ async function convertPointsToTokens() {
 }
 
 // Schedule weekly token conversion (every Sunday at 00:00)
-const schedule = require("node-schedule");
+
 schedule.scheduleJob("0 0 * * 0", convertPointsToTokens);
 
 bot.telegram.deleteWebhook(); // Ensure webhook is removed
@@ -1612,7 +1613,7 @@ async function checkCompletedWithdrawals() {
 
 // Run the check every minute
 // Schedule withdrawal checks every 10 seconds
-const schedule = require("node-schedule");
+
 schedule.scheduleJob("*/10 * * * * *", checkCompletedWithdrawals);
 
 // Also add a command for admins to force check
