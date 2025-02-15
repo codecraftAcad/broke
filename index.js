@@ -900,10 +900,19 @@ async function sendTokens(address, amount) {
 
 // Helper function to check if it's Sunday
 function isSunday() {
+  // Get current date in UTC
   const today = new Date();
-  console.log(`Current day: ${today.getDay()}`); // Log the current day (0-6)
-  console.log(`Current date: ${today.toISOString()}`); // Log full date/time
-  return today.getDay() === 0;
+  
+  // Convert to user's local timezone
+  const localDate = new Date(today.toLocaleString());
+  
+  console.log(`UTC day: ${today.getDay()}`); // Log UTC day
+  console.log(`Local day: ${localDate.getDay()}`); // Log local day
+  console.log(`UTC date: ${today.toISOString()}`); // Log UTC date/time
+  console.log(`Local date: ${localDate.toLocaleString()}`); // Log local date/time
+
+  // Use local date to check if it's Sunday
+  return localDate.getDay() === 0;
 }
 
 // Add the withdraw command
