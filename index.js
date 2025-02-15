@@ -536,15 +536,15 @@ async function convertPointsToTokens() {
 schedule.scheduleJob("0 0 * * 0", convertPointsToTokens);
 
 bot.telegram.deleteWebhook(); // Ensure webhook is removed
-// bot.launch({
-//   allowedUpdates: ["message", "message_reaction"],
-//   webhook: {
-//     domain: "https://broke-za2z.onrender.com",
-//     port: process.env.PORT || 3000,
-//   },
-// });
+bot.launch({
+  allowedUpdates: ["message", "message_reaction"],
+  webhook: {
+    domain: "https://broke-za2z.onrender.com",
+    port: process.env.PORT || 3000,
+  },
+});
 
-bot.launch();
+// bot.launch();
 
 // Enable graceful stop
 process.once("SIGINT", () => bot.stop("SIGINT"));
@@ -940,10 +940,6 @@ bot.command("withdraw", async (ctx) => {
           `Available balance: ${user.brokeTokens} $BROKE`
       );
     }
-
-
-    
-    
 
     // Validate amount
     if (!amount || isNaN(amount) || amount <= 0) {
@@ -1678,7 +1674,9 @@ bot.command("totals", async (ctx) => {
         `• $BROKE per User: ${formatNumber(
           Math.floor(totalTokens / totalUsers)
         )}\n\n` +
-        `Total Broke to fund: ${formatNumber((totalPoints + totalTokens)/2)}\n\n` +
+        `Total Broke to fund: ${formatNumber(
+          (totalPoints + totalTokens) / 2
+        )}\n\n` +
         `Generated: ${new Date().toLocaleString()}`
     );
   } catch (error) {
