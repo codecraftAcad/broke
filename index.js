@@ -922,14 +922,14 @@ bot.command("withdraw", async (ctx) => {
     }
 
     // Check if it's Sunday
-    // if (!isSunday()) {
-    //   const countdown = getNextSundayCountdown();
-    //   return ctx.reply(
-    //     `❌ Withdrawals are only available on Sundays!\n\n` +
-    //       `⏰ Next withdrawal window opens in: ${countdown}\n\n` +
-    //       `Current balance: ${user.brokeTokens} $BROKE`
-    //   );
-    // }
+    if (!isSunday()) {
+      const countdown = getNextSundayCountdown();
+      return ctx.reply(
+        `❌ Withdrawals are only available on Sundays!\n\n` +
+          `⏰ Next withdrawal window opens in: ${countdown}\n\n` +
+          `Current balance: ${user.brokeTokens} $BROKE`
+      );
+    }
     // Get amount from command
     const args = ctx.message.text.split(" ");
     if (args.length !== 2) {
