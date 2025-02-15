@@ -1678,7 +1678,7 @@ bot.command("totals", async (ctx) => {
         `• $BROKE per User: ${formatNumber(
           Math.floor(totalTokens / totalUsers)
         )}\n\n` +
-        `Total Broke to fund: ${formatNumber(totalPoints + totalTokens)/2}\n\n` +
+        `Total Broke to fund: ${formatNumber((totalPoints + totalTokens)/2)}\n\n` +
         `Generated: ${new Date().toLocaleString()}`
     );
   } catch (error) {
