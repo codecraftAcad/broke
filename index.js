@@ -499,7 +499,7 @@ async function convertPointsToTokens() {
     });
 
     for (const user of users) {
-      const tokensEarned = user.leaderboardPoints;
+      const tokensEarned = Math.floor(user.leaderboardPoints / 2); // 2:1 conversion rate
       if (tokensEarned > 0) {
         await prisma.user.update({
           where: { tgId: user.tgId },
@@ -536,15 +536,15 @@ async function convertPointsToTokens() {
 schedule.scheduleJob("0 0 * * 0", convertPointsToTokens);
 
 bot.telegram.deleteWebhook(); // Ensure webhook is removed
-bot.launch({
-  allowedUpdates: ["message", "message_reaction"],
-  webhook: {
-    domain: "https://broke-za2z.onrender.com",
-    port: process.env.PORT || 3000,
-  },
-});
+// bot.launch({
+//   allowedUpdates: ["message", "message_reaction"],
+//   webhook: {
+//     domain: "https://broke-za2z.onrender.com",
+//     port: process.env.PORT || 3000,
+//   },
+// });
 
-// bot.launch();
+bot.launch();
 
 // Enable graceful stop
 process.once("SIGINT", () => bot.stop("SIGINT"));
@@ -942,41 +942,7 @@ bot.command("withdraw", async (ctx) => {
     }
 
 
-    // Check if user has already withdrawn today
-    const today = new Date();
-    const withdrawalHistory = await prisma.activity.findFirst({
-      where: {
-        userId: user.id,
-        type: 'withdraw',
-        action: 'requested',
-        createdAt: {
-          gte: new Date(today.getFullYear(), today.getMonth(), today.getDate())
-        }
-      }
-    });
-
-    if (withdrawalHistory) {
-      return ctx.reply(
-        `❌ You have already made a withdrawal today!\n\n` +
-        `Withdrawals are limited to once per Sunday.\n` +
-        `Please try again next Sunday.`
-      );
-    }
-
-    // Calculate maximum allowed withdrawal (50% of balance)
-    const maxWithdrawal = Math.floor(user.brokeTokens * 0.5);
-
-    // Parse amount from command
-    const amount = parseInt(args[1]);
-
-    // Check if amount exceeds 50% limit
-    if (amount > maxWithdrawal) {
-      return ctx.reply(
-        `❌ You can only withdraw up to 50% of your balance per Sunday!\n\n` +
-        `Your balance: ${user.brokeTokens} $BROKE\n` +
-        `Maximum withdrawal: ${maxWithdrawal} $BROKE`
-      );
-    }
+    
     
 
     // Validate amount
