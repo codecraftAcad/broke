@@ -922,14 +922,14 @@ bot.command("withdraw", async (ctx) => {
     }
 
     // Check if it's Sunday
-    if (!isSunday()) {
-      const countdown = getNextSundayCountdown();
-      return ctx.reply(
-        `❌ Withdrawals are only available on Sundays!\n\n` +
-          `⏰ Next withdrawal window opens in: ${countdown}\n\n` +
-          `Current balance: ${user.brokeTokens} $BROKE`
-      );
-    }
+    // if (!isSunday()) {
+    //   const countdown = getNextSundayCountdown();
+    //   return ctx.reply(
+    //     `❌ Withdrawals are only available on Sundays!\n\n` +
+    //       `⏰ Next withdrawal window opens in: ${countdown}\n\n` +
+    //       `Current balance: ${user.brokeTokens} $BROKE`
+    //   );
+    // }
     // Get amount from command
     const args = ctx.message.text.split(" ");
     if (args.length !== 2) {
@@ -941,7 +941,43 @@ bot.command("withdraw", async (ctx) => {
       );
     }
 
+
+    // Check if user has already withdrawn today
+    const today = new Date();
+    const withdrawalHistory = await prisma.activity.findFirst({
+      where: {
+        userId: user.id,
+        type: 'withdraw',
+        action: 'requested',
+        createdAt: {
+          gte: new Date(today.getFullYear(), today.getMonth(), today.getDate())
+        }
+      }
+    });
+
+    if (withdrawalHistory) {
+      return ctx.reply(
+        `❌ You have already made a withdrawal today!\n\n` +
+        `Withdrawals are limited to once per Sunday.\n` +
+        `Please try again next Sunday.`
+      );
+    }
+
+    // Calculate maximum allowed withdrawal (50% of balance)
+    const maxWithdrawal = Math.floor(user.brokeTokens * 0.5);
+
+    // Parse amount from command
     const amount = parseInt(args[1]);
+
+    // Check if amount exceeds 50% limit
+    if (amount > maxWithdrawal) {
+      return ctx.reply(
+        `❌ You can only withdraw up to 50% of your balance per Sunday!\n\n` +
+        `Your balance: ${user.brokeTokens} $BROKE\n` +
+        `Maximum withdrawal: ${maxWithdrawal} $BROKE`
+      );
+    }
+    
 
     // Validate amount
     if (!amount || isNaN(amount) || amount <= 0) {
