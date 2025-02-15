@@ -345,17 +345,21 @@ bot.command("leaderboard", async (ctx) => {
     // Get top 10 users by points and tokens
     const users = await prisma.user.findMany({
       orderBy: [{ leaderboardPoints: "desc" }, { brokeTokens: "desc" }],
-      take: 10,
+      take: 11,
     });
 
     if (users.length === 0) {
       return ctx.reply("No brokies found in the leaderboard yet! 😢");
     }
 
+    const filteredUsers = users
+      .filter((user) => user.username.toLowerCase() !== "habibilord")
+      .slice(0, 10);
+
     // Create leaderboard message
     let leaderboardMsg = `🏆 Brokies Leaderboard\n` + `━━━━━━━━━━━━━━━━━\n\n`;
 
-    users.forEach((user, index) => {
+    filteredUsers.forEach((user, index) => {
       const medal =
         index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : "🏅";
       leaderboardMsg +=
@@ -1672,7 +1676,7 @@ bot.command("totals", async (ctx) => {
         `• $BROKE per User: ${formatNumber(
           Math.floor(totalTokens / totalUsers)
         )}\n\n` +
-        `Total Broke to fund: ${formatNumber(totalPoints + totalTokens)}\n\n` + 
+        `Total Broke to fund: ${formatNumber(totalPoints + totalTokens)}\n\n` +
         `Generated: ${new Date().toLocaleString()}`
     );
   } catch (error) {
