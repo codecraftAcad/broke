@@ -900,7 +900,10 @@ async function sendTokens(address, amount) {
 
 // Helper function to check if it's Sunday
 function isSunday() {
-  return new Date().getDay() === 0;
+  const today = new Date();
+  console.log(`Current day: ${today.getDay()}`); // Log the current day (0-6)
+  console.log(`Current date: ${today.toISOString()}`); // Log full date/time
+  return today.getDay() === 0;
 }
 
 // Add the withdraw command
