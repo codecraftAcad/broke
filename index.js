@@ -952,6 +952,7 @@ bot.command("withdraw", async (ctx) => {
           `Available balance: ${user.brokeTokens} $BROKE`
       );
     }
+    const amount = parseInt(args[1]);
 
     // Validate amount
     if (!amount || isNaN(amount) || amount <= 0) {
