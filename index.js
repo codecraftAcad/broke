@@ -1648,52 +1648,52 @@ bot.command("checkwithdrawals", async (ctx) => {
 });
 
 // Admin command to get total balances
-bot.command("totals", async (ctx) => {
-  try {
-    const tgId = ctx.from.id.toString();
-    if (!ADMIN_IDS.includes(tgId)) {
-      return;
-    }
+// bot.command("totals", async (ctx) => {
+//   try {
+//     const tgId = ctx.from.id.toString();
+//     if (!ADMIN_IDS.includes(tgId)) {
+//       return;
+//     }
 
-    // Get all users
-    const users = await prisma.user.findMany();
+//     // Get all users
+//     const users = await prisma.user.findMany();
 
-    // Calculate totals
-    const totalPoints = users.reduce(
-      (sum, user) => sum + user.leaderboardPoints,
-      0
-    );
-    const totalTokens = users.reduce((sum, user) => sum + user.brokeTokens, 0);
-    const totalUsers = users.length;
-    const activeUsers = users.filter((u) => u.lastBrokeCheck).length;
+//     // Calculate totals
+//     const totalPoints = users.reduce(
+//       (sum, user) => sum + user.leaderboardPoints,
+//       0
+//     );
+//     const totalTokens = users.reduce((sum, user) => sum + user.brokeTokens, 0);
+//     const totalUsers = users.length;
+//     const activeUsers = users.filter((u) => u.lastBrokeCheck).length;
 
-    // Format numbers with commas
-    const formatNumber = (num) =>
-      num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+//     // Format numbers with commas
+//     const formatNumber = (num) =>
+//       num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 
-    await ctx.reply(
-      `📊 BROKE BOT STATISTICS 📊\n` +
-        `━━━━━━━━━━━━━━━━━\n\n` +
-        `👥 USERS:\n` +
-        `• Total Users: ${formatNumber(totalUsers)}\n` +
-        `• Active Users: ${formatNumber(activeUsers)}\n\n` +
-        `💰 ECONOMY:\n` +
-        `• Total Points: ${formatNumber(totalPoints)}\n` +
-        `• Total $BROKE: ${formatNumber(totalTokens)}\n\n` +
-        `📈 AVERAGES:\n` +
-        `• Points per User: ${formatNumber(
-          Math.floor(totalPoints / totalUsers)
-        )}\n` +
-        `• $BROKE per User: ${formatNumber(
-          Math.floor(totalTokens / totalUsers)
-        )}\n\n` +
-        `Total Broke to fund: ${formatNumber(
-          (totalPoints + totalTokens) / 2
-        )}\n\n` +
-        `Generated: ${new Date().toLocaleString()}`
-    );
-  } catch (error) {
-    console.error("Totals command error:", error);
-    ctx.reply("❌ Failed to fetch totals. Please try again later!");
-  }
-});
+//     await ctx.reply(
+//       `📊 BROKE BOT STATISTICS 📊\n` +
+//         `━━━━━━━━━━━━━━━━━\n\n` +
+//         `👥 USERS:\n` +
+//         `• Total Users: ${formatNumber(totalUsers)}\n` +
+//         `• Active Users: ${formatNumber(activeUsers)}\n\n` +
+//         `💰 ECONOMY:\n` +
+//         `• Total Points: ${formatNumber(totalPoints)}\n` +
+//         `• Total $BROKE: ${formatNumber(totalTokens)}\n\n` +
+//         `📈 AVERAGES:\n` +
+//         `• Points per User: ${formatNumber(
+//           Math.floor(totalPoints / totalUsers)
+//         )}\n` +
+//         `• $BROKE per User: ${formatNumber(
+//           Math.floor(totalTokens / totalUsers)
+//         )}\n\n` +
+//         `Total Broke to fund: ${formatNumber(
+//           (totalPoints + totalTokens) / 2
+//         )}\n\n` +
+//         `Generated: ${new Date().toLocaleString()}`
+//     );
+//   } catch (error) {
+//     console.error("Totals command error:", error);
+//     ctx.reply("❌ Failed to fetch totals. Please try again later!");
+//   }
+// });
