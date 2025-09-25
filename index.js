@@ -195,7 +195,7 @@ bot.start(async (ctx) => {
     `━━━━━━━━━━━━━━━━━\n` +
     `⏰ Every Sunday:\n` +
     `➤ Points convert to Broke Tokens\n` +
-    `➤ Rate: 15 points = 1 $BROKE\n` +
+    `➤ Rate: 100 points = 1 $BROKE\n` +
     `➤ Points reset after conversion\n` +
     `➤ Tokens are forever! 🌟`;
 
@@ -499,7 +499,7 @@ async function convertPointsToTokens() {
     });
 
     for (const user of users) {
-      const tokensEarned = Math.floor(user.leaderboardPoints / 15); // 15:1 conversion rate
+      const tokensEarned = Math.floor(user.leaderboardPoints / 100); // 15:1 conversion rate
       if (tokensEarned > 0) {
         await prisma.user.update({
           where: { tgId: user.tgId },
