@@ -101,8 +101,45 @@ const BROKE_TOKEN_ADDRESS = process.env.BROKE_TOKEN_ADDRESS;
 
 const RUMBLE_DURATION = 30; // seconds to join
 const MIN_PLAYERS = 2;
+const MAX_PLAYERS = 8;
 const ELIMINATION_DELAY = 3; // seconds between eliminations
 let activeRumble = null;
+
+// Bot names for rumble
+const BOT_NAMES = [
+  "CryptoBot_3000",
+  "DiamondHands_AI",
+  "MoonBoy_Bot",
+  "HODL_Machine",
+  "PumpKing_Bot",
+  "RektBot_2024",
+  "FOMO_AI",
+  "PaperHands_Bot",
+  "WhaleBot_X",
+  "ApeBot_Alpha",
+  "DeFi_Destroyer",
+  "RugBot_Prime",
+  "LamboBot_69",
+  "StonksBot_AI",
+  "DegenBot_Ultra",
+  "ChadBot_9000",
+  "BasedBot_420",
+  "GigaBot_Chad",
+  "SigmaBot_Alpha",
+  "AlphaBot_Omega",
+  "BetaBot_Gamma",
+  "GammaBot_Delta",
+  "DeltaBot_Epsilon",
+  "EpsilonBot_Zeta",
+  "ZetaBot_Eta",
+  "EtaBot_Theta",
+  "ThetaBot_Iota",
+  "IotaBot_Kappa",
+  "KappaBot_Lambda",
+  "LambdaBot_Mu",
+  "MuBot_Nu",
+  "NuBot_Xi",
+];
 
 const DAILY_ROULETTE_LIMIT = 30;
 
@@ -902,10 +939,10 @@ async function sendTokens(address, amount) {
 function isSunday() {
   // Get current date in UTC
   const today = new Date();
-  
+
   // Convert to user's local timezone
   const localDate = new Date(today.toLocaleString());
-  
+
   console.log(`UTC day: ${today.getDay()}`); // Log UTC day
   console.log(`Local day: ${localDate.getDay()}`); // Log local day
   console.log(`UTC date: ${today.toISOString()}`); // Log UTC date/time
@@ -1087,7 +1124,8 @@ bot.command("brokerumble", async (ctx) => {
       `🏆 BROKE RUMBLE STARTING! 🏆\n` +
         `━━━━━━━━━━━━━━━━━\n\n` +
         `💰 Prize: 25000 broke points\n` +
-        `⏳ Time to join: ${RUMBLE_DURATION} seconds\n\n` +
+        `⏳ Time to join: ${RUMBLE_DURATION} seconds\n` +
+        `🤖 Bot players will be added if needed (max 8 players)\n\n` +
         `Reply with /join to enter!\n\n` +
         `Players (0): None`
     );
@@ -1096,10 +1134,40 @@ bot.command("brokerumble", async (ctx) => {
 
     // Start timer for joining period
     setTimeout(async () => {
-      if (activeRumble?.players.length < MIN_PLAYERS) {
-        ctx.reply("❌ Not enough players joined! Rumble cancelled.");
-        activeRumble = null;
-        return;
+      if (!activeRumble) return;
+
+      const realPlayers = activeRumble.players.length;
+
+      // If not enough real players, add bots to reach MIN_PLAYERS
+      if (realPlayers < MIN_PLAYERS) {
+        const botsNeeded = MIN_PLAYERS - realPlayers;
+        const botPlayers = generateBotPlayers(botsNeeded);
+        activeRumble.players.push(...botPlayers);
+
+        await ctx.reply(
+          `🤖 Adding ${botsNeeded} bot player${
+            botsNeeded > 1 ? "s" : ""
+          } to make the rumble happen!\n` +
+            `Bot players: ${botPlayers
+              .map((bot) => `@${bot.username}`)
+              .join(", ")}`
+        );
+      }
+
+      // If we have fewer than MAX_PLAYERS, add more bots to make it more exciting
+      if (activeRumble.players.length < MAX_PLAYERS) {
+        const additionalBotsNeeded = MAX_PLAYERS - activeRumble.players.length;
+        const additionalBots = generateBotPlayers(additionalBotsNeeded);
+        activeRumble.players.push(...additionalBots);
+
+        await ctx.reply(
+          `🎮 Adding ${additionalBotsNeeded} more bot player${
+            additionalBotsNeeded > 1 ? "s" : ""
+          } for maximum chaos!\n` +
+            `Additional bots: ${additionalBots
+              .map((bot) => `@${bot.username}`)
+              .join(", ")}`
+        );
       }
 
       await startRumble(ctx);
@@ -1143,7 +1211,9 @@ bot.command("join", async (ctx) => {
         `⏳ Time to join: ${RUMBLE_DURATION} seconds\n\n` +
         `Reply with /join@brokiesbrokebot to enter!\n\n` +
         `Players (${activeRumble.players.length}): \n` +
-        activeRumble.players.map((p) => `• @${p.username}`).join("\n")
+        activeRumble.players
+          .map((p) => `• @${p.username}${p.isBot ? " 🤖" : ""}`)
+          .join("\n")
     );
   } catch (error) {
     console.error("Join error:", error);
@@ -1253,6 +1323,28 @@ const rumbleMessages = {
   ],
 };
 
+// Helper function to generate bot players
+function generateBotPlayers(count) {
+  const bots = [];
+  const usedNames = new Set();
+
+  for (let i = 0; i < count; i++) {
+    let botName;
+    do {
+      botName = BOT_NAMES[Math.floor(Math.random() * BOT_NAMES.length)];
+    } while (usedNames.has(botName));
+
+    usedNames.add(botName);
+    bots.push({
+      id: `bot_${i}_${Date.now()}`,
+      username: botName,
+      isBot: true,
+    });
+  }
+
+  return bots;
+}
+
 // Helper function to get random message and replace placeholders
 function getRandomMessage(category, replacements = {}) {
   const messages = rumbleMessages[category];
@@ -1275,12 +1367,23 @@ async function startRumble(ctx) {
       hp: 100, // Each player starts with 100 HP
     }));
 
+    const realPlayers = players.filter((p) => !p.isBot);
+    const botPlayers = players.filter((p) => p.isBot);
+
     await ctx.reply(
       `🎮 BROKE RUMBLE HAS BEGUN! 🎮\n` +
         `━━━━━━━━━━━━━━━━━\n\n` +
         `💀 ${players.length} $BROKE warriors enter the arena!\n` +
         `🛑 Only one will become the $BROKE champion!\n\n` +
-        players.map((p) => `• @${p.username} (100 HP)`).join("\n")
+        `👥 Players:\n` +
+        players
+          .map((p) => `• @${p.username} (100 HP)${p.isBot ? " 🤖" : ""}`)
+          .join("\n") +
+        (realPlayers.length > 0 && botPlayers.length > 0
+          ? `\n\n📊 ${realPlayers.length} real player${
+              realPlayers.length > 1 ? "s" : ""
+            } vs ${botPlayers.length} bot${botPlayers.length > 1 ? "s" : ""}`
+          : "")
     );
 
     // Battle loop
@@ -1352,45 +1455,63 @@ async function startRumble(ctx) {
     // Announce winner
     const winner = players[0];
 
-    // Fetch full user data for the winner
-    const winnerData = await prisma.user.findUnique({
-      where: { tgId: winner.id },
-    });
+    // Check if winner is a bot
+    if (winner.isBot) {
+      await ctx.reply(
+        `🎉 BROKE RUMBLE WINNER! 🎉\n` +
+          `━━━━━━━━━━━━━━━━━\n\n` +
+          `${getRandomMessage("winner", { winner: winner.username })}\n` +
+          `🤖 A bot won! No points awarded this time.`
+      );
+    } else {
+      // Fetch full user data for the winner
+      const winnerData = await prisma.user.findUnique({
+        where: { tgId: winner.id },
+      });
 
-    if (!winnerData) {
-      throw new Error("Winner data not found");
-    }
+      if (!winnerData) {
+        throw new Error("Winner data not found");
+      }
 
-    const previousBalance = winnerData.leaderboardPoints;
+      const previousBalance = winnerData.leaderboardPoints;
 
-    // Update points
-    await prisma.user.update({
-      where: { tgId: winner.id },
-      data: {
-        leaderboardPoints: {
-          increment: 25000,
+      // Update points
+      await prisma.user.update({
+        where: { tgId: winner.id },
+        data: {
+          leaderboardPoints: {
+            increment: 25000,
+          },
         },
-      },
-    });
+      });
 
-    await ctx.reply(
-      `🎉 BROKE RUMBLE WINNER! 🎉\n` +
-        `━━━━━━━━━━━━━━━━━\n\n` +
-        `${getRandomMessage("winner", { winner: winner.username })}\n` +
-        `Prize: 25000 broke points 💰`
-    );
+      await ctx.reply(
+        `🎉 BROKE RUMBLE WINNER! 🎉\n` +
+          `━━━━━━━━━━━━━━━━━\n\n` +
+          `${getRandomMessage("winner", { winner: winner.username })}\n` +
+          `Prize: 25000 broke points 💰`
+      );
 
-    // Log activity with correct balance
-    await logActivity(winnerData.id, "rumble", "won", 25000, previousBalance, {
-      totalPlayers: activeRumble.players.length,
-      participants: activeRumble.players.map((p) => ({
-        username: p.username,
-        id: p.id,
-      })),
-      timestamp: new Date(),
-      gameLength: Date.now() - (activeRumble.startTime || Date.now()),
-      previousBalance,
-    });
+      // Log activity with correct balance
+      await logActivity(
+        winnerData.id,
+        "rumble",
+        "won",
+        25000,
+        previousBalance,
+        {
+          totalPlayers: activeRumble.players.length,
+          participants: activeRumble.players.map((p) => ({
+            username: p.username,
+            id: p.id,
+            isBot: p.isBot || false,
+          })),
+          timestamp: new Date(),
+          gameLength: Date.now() - (activeRumble.startTime || Date.now()),
+          previousBalance,
+        }
+      );
+    }
 
     // Clear active rumble
     activeRumble = null;
