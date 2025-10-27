@@ -101,7 +101,7 @@ const BROKE_TOKEN_ADDRESS = process.env.BROKE_TOKEN_ADDRESS;
 
 const RUMBLE_DURATION = 30; // seconds to join
 const MIN_PLAYERS = 2;
-const MAX_PLAYERS = 8;
+const MAX_BOT_PLAYERS = 4;
 const ELIMINATION_DELAY = 3; // seconds between eliminations
 let activeRumble = null;
 
@@ -1125,7 +1125,7 @@ bot.command("brokerumble", async (ctx) => {
         `━━━━━━━━━━━━━━━━━\n\n` +
         `💰 Prize: 25000 broke points\n` +
         `⏳ Time to join: ${RUMBLE_DURATION} seconds\n` +
-        `🤖 Bot players will be added if needed (max 8 players)\n\n` +
+        `🤖 Bot players will be added if needed (max 4 bots)\n\n` +
         `Reply with /join to enter!\n\n` +
         `Players (0): None`
     );
@@ -1138,25 +1138,34 @@ bot.command("brokerumble", async (ctx) => {
 
       const realPlayers = activeRumble.players.length;
 
+      // Count existing bots
+      const existingBots = activeRumble.players.filter((p) => p.isBot).length;
+
       // If not enough real players, add bots to reach MIN_PLAYERS
       if (realPlayers < MIN_PLAYERS) {
-        const botsNeeded = MIN_PLAYERS - realPlayers;
-        const botPlayers = generateBotPlayers(botsNeeded);
-        activeRumble.players.push(...botPlayers);
-
-        await ctx.reply(
-          `🤖 Adding ${botsNeeded} bot player${
-            botsNeeded > 1 ? "s" : ""
-          } to make the rumble happen!\n` +
-            `Bot players: ${botPlayers
-              .map((bot) => `@${bot.username}`)
-              .join(", ")}`
+        const botsNeeded = Math.min(
+          MIN_PLAYERS - realPlayers,
+          MAX_BOT_PLAYERS - existingBots
         );
+        if (botsNeeded > 0) {
+          const botPlayers = generateBotPlayers(botsNeeded);
+          activeRumble.players.push(...botPlayers);
+
+          await ctx.reply(
+            `🤖 Adding ${botsNeeded} bot player${
+              botsNeeded > 1 ? "s" : ""
+            } to make the rumble happen!\n` +
+              `Bot players: ${botPlayers
+                .map((bot) => `@${bot.username}`)
+                .join(", ")}`
+          );
+        }
       }
 
-      // If we have fewer than MAX_PLAYERS, add more bots to make it more exciting
-      if (activeRumble.players.length < MAX_PLAYERS) {
-        const additionalBotsNeeded = MAX_PLAYERS - activeRumble.players.length;
+      // Add more bots up to MAX_BOT_PLAYERS for excitement (if we have room)
+      const currentBots = activeRumble.players.filter((p) => p.isBot).length;
+      if (currentBots < MAX_BOT_PLAYERS) {
+        const additionalBotsNeeded = MAX_BOT_PLAYERS - currentBots;
         const additionalBots = generateBotPlayers(additionalBotsNeeded);
         activeRumble.players.push(...additionalBots);
 
