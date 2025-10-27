@@ -1446,12 +1446,68 @@ async function startRumble(ctx) {
 
     // Check if winner is a bot
     if (winner.isBot) {
-      await ctx.reply(
-        `🎉 BROKE RUMBLE WINNER! 🎉\n` +
-          `━━━━━━━━━━━━━━━━━\n\n` +
-          `${getRandomMessage("winner", { winner: winner.username })}\n` +
-          `🤖 A bot won! No points awarded this time.`
-      );
+      // Give pity points to all real players
+      const realPlayers = activeRumble.players.filter((p) => !p.isBot);
+
+      if (realPlayers.length > 0) {
+        // Update points for all real players
+        for (const player of realPlayers) {
+          const playerData = await prisma.user.findUnique({
+            where: { tgId: player.id },
+          });
+
+          if (playerData) {
+            const previousBalance = playerData.leaderboardPoints;
+
+            await prisma.user.update({
+              where: { tgId: player.id },
+              data: {
+                leaderboardPoints: {
+                  increment: 2500,
+                },
+              },
+            });
+
+            // Log activity for each player
+            await logActivity(
+              playerData.id,
+              "rumble",
+              "pity_points",
+              2500,
+              previousBalance,
+              {
+                totalPlayers: activeRumble.players.length,
+                participants: activeRumble.players.map((p) => ({
+                  username: p.username,
+                  id: p.id,
+                  isBot: p.isBot || false,
+                })),
+                timestamp: new Date(),
+                gameLength: Date.now() - (activeRumble.startTime || Date.now()),
+                previousBalance,
+                winner: winner.username,
+              }
+            );
+          }
+        }
+
+        await ctx.reply(
+          `🎉 BROKE RUMBLE WINNER! 🎉\n` +
+            `━━━━━━━━━━━━━━━━━\n\n` +
+            `${getRandomMessage("winner", { winner: winner.username })}\n` +
+            `🤖 A bot won! All real players get 2500 pity points! 💰\n\n` +
+            `Pity points awarded to: ${realPlayers
+              .map((p) => `@${p.username}`)
+              .join(", ")}`
+        );
+      } else {
+        await ctx.reply(
+          `🎉 BROKE RUMBLE WINNER! 🎉\n` +
+            `━━━━━━━━━━━━━━━━━\n\n` +
+            `${getRandomMessage("winner", { winner: winner.username })}\n` +
+            `🤖 A bot won! No real players to award pity points.`
+        );
+      }
     } else {
       // Fetch full user data for the winner
       const winnerData = await prisma.user.findUnique({
