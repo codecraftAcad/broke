@@ -1125,7 +1125,7 @@ bot.command("brokerumble", async (ctx) => {
         `━━━━━━━━━━━━━━━━━\n\n` +
         `💰 Prize: 25000 broke points\n` +
         `⏳ Time to join: ${RUMBLE_DURATION} seconds\n` +
-        `🤖 Bot players will be added if needed (max 4 bots)\n\n` +
+        `🤖 4 bot players will be added if fewer than 4 real players join\n\n` +
         `Reply with /join to enter!\n\n` +
         `Players (0): None`
     );
@@ -1141,12 +1141,9 @@ bot.command("brokerumble", async (ctx) => {
       // Count existing bots
       const existingBots = activeRumble.players.filter((p) => p.isBot).length;
 
-      // If not enough real players, add bots to reach MIN_PLAYERS
-      if (realPlayers < MIN_PLAYERS) {
-        const botsNeeded = Math.min(
-          MIN_PLAYERS - realPlayers,
-          MAX_BOT_PLAYERS - existingBots
-        );
+      // If fewer than 4 real players, add exactly 4 bots
+      if (realPlayers < 4) {
+        const botsNeeded = 4 - existingBots;
         if (botsNeeded > 0) {
           const botPlayers = generateBotPlayers(botsNeeded);
           activeRumble.players.push(...botPlayers);
@@ -1154,29 +1151,12 @@ bot.command("brokerumble", async (ctx) => {
           await ctx.reply(
             `🤖 Adding ${botsNeeded} bot player${
               botsNeeded > 1 ? "s" : ""
-            } to make the rumble happen!\n` +
+            } to make the rumble exciting!\n` +
               `Bot players: ${botPlayers
                 .map((bot) => `@${bot.username}`)
                 .join(", ")}`
           );
         }
-      }
-
-      // Add more bots up to MAX_BOT_PLAYERS for excitement (if we have room)
-      const currentBots = activeRumble.players.filter((p) => p.isBot).length;
-      if (currentBots < MAX_BOT_PLAYERS) {
-        const additionalBotsNeeded = MAX_BOT_PLAYERS - currentBots;
-        const additionalBots = generateBotPlayers(additionalBotsNeeded);
-        activeRumble.players.push(...additionalBots);
-
-        await ctx.reply(
-          `🎮 Adding ${additionalBotsNeeded} more bot player${
-            additionalBotsNeeded > 1 ? "s" : ""
-          } for maximum chaos!\n` +
-            `Additional bots: ${additionalBots
-              .map((bot) => `@${bot.username}`)
-              .join(", ")}`
-        );
       }
 
       await startRumble(ctx);
